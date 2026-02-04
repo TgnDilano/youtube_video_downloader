@@ -3,11 +3,16 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ytdlapp/models/download_task.dart';
 
 class DownloadController extends ChangeNotifier {
   List<DownloadTask> tasks = [];
   List<String> log = [];
+
+  DownloadController() {
+    loadHistory();
+  }
 
   List<DownloadTask> get downloadingTasks => tasks
       .where(
@@ -25,6 +30,39 @@ class DownloadController extends ChangeNotifier {
       )
       .toList();
 
+  Future<void> loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historyJson = prefs.getStringList('download_history') ?? [];
+    tasks = historyJson
+        .map((j) => DownloadTask.fromJson(jsonDecode(j)))
+        .toList();
+    notifyListeners();
+  }
+
+  Future<void> saveHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final historyJson = tasks.map((t) => jsonEncode(t.toJson())).toList();
+    await prefs.setStringList('download_history', historyJson);
+  }
+
+  Future<Map<String, dynamic>?> fetchVideoInfo(String url) async {
+    if (url.isEmpty) return null;
+    final ytDlp = await _getBinaryPath('yt-dlp');
+    try {
+      final result = await Process.run(ytDlp, [
+        '--dump-json',
+        '--no-playlist',
+        url,
+      ]);
+      if (result.exitCode == 0) {
+        return jsonDecode(result.stdout);
+      }
+    } catch (e) {
+      log.add("Error fetching video info: $e");
+    }
+    return null;
+  }
+
   void addDownload(
     String url,
     String savePath,
@@ -32,6 +70,8 @@ class DownloadController extends ChangeNotifier {
     bool isPlaylist = false,
     int? playlistStart,
     int? playlistEnd,
+    String resolution = "best",
+    Map<String, dynamic>? metadata,
   }) async {
     if (url.isEmpty) return;
 
@@ -44,10 +84,26 @@ class DownloadController extends ChangeNotifier {
         playlistEnd: playlistEnd,
       );
     } else {
-      final task = DownloadTask(id: DateTime.now().toString(), url: url);
+      final task = DownloadTask(
+        id: DateTime.now().toString(),
+        url: url,
+        resolution: resolution,
+        savePath: savePath,
+      );
+
+      if (metadata != null) {
+        task.title = metadata['title'] ?? "Unknown Title";
+        task.thumbnail = metadata['thumbnail'] ?? "";
+        task.metadata = "YouTube • ${metadata['duration_string'] ?? 'Unknown'}";
+      }
+
       tasks.insert(0, task);
       notifyListeners();
-      await _fetchMetadata(task);
+
+      if (metadata == null) {
+        await _fetchMetadata(task);
+      }
+
       _startDownload(task, savePath, audioOnly);
     }
   }
@@ -64,6 +120,7 @@ class DownloadController extends ChangeNotifier {
       url: url,
       title: "Fetching playlist info...",
       isPlaylist: true,
+      savePath: savePath,
     );
     tasks.insert(0, parentTask);
     notifyListeners();
@@ -88,10 +145,11 @@ class DownloadController extends ChangeNotifier {
         for (var line in lines) {
           final data = jsonDecode(line);
           final childTask = DownloadTask(
-            id: data['id'],
-            url: data['url'],
+            id: data['id'] ?? DateTime.now().toString(),
+            url: data['url'] ?? data['webpage_url'] ?? url,
             title: data['title'] ?? 'Unknown Title',
             metadata: "Queued",
+            savePath: savePath,
           );
           parentTask.children.add(childTask);
         }
@@ -175,9 +233,11 @@ class DownloadController extends ChangeNotifier {
       task.status = DownloadStatus.completed;
       task.playlistProgress = "All videos downloaded";
       task.update();
+      saveHistory();
       notifyListeners();
     } else {
       await _executeDownload(task, savePath, audioOnly);
+      saveHistory();
     }
   }
 
@@ -190,9 +250,17 @@ class DownloadController extends ChangeNotifier {
     task.update();
 
     final ytDlp = await _getBinaryPath('yt-dlp');
-    List<String> args = audioOnly
-        ? ['-x', '--audio-format', 'mp3']
-        : ['-f', 'bv*+ba/b', '--merge-output-format', 'mp4'];
+    List<String> args = [];
+
+    if (audioOnly) {
+      args = ['-x', '--audio-format', 'mp3'];
+    } else {
+      // Use selected resolution or default to best
+      String format = task.resolution == "best"
+          ? 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b'
+          : 'bv*[height<=${task.resolution}][ext=mp4]+ba[ext=m4a]/b[height<=${task.resolution}][ext=mp4] / bv*[height<=${task.resolution}]+ba/b[height<=${task.resolution}]';
+      args = ['-f', format, '--merge-output-format', 'mp4'];
+    }
 
     args.addAll([
       '--no-playlist',
@@ -202,7 +270,9 @@ class DownloadController extends ChangeNotifier {
       task.url,
     ]);
 
-    log.add('--- Starting Download: ${task.title} ---');
+    log.add(
+      '--- Starting Download: ${task.title} (Res: ${task.resolution}) ---',
+    );
     log.add('yt-dlp ${args.join(' ')}');
     notifyListeners();
 
@@ -219,11 +289,27 @@ class DownloadController extends ChangeNotifier {
 
         task.liveOutput += data;
 
+        // Better progress parsing
+        // [download]  10.5% of 100.00MiB at 10.00MiB/s ETA 00:09
         final progressRegex = RegExp(r'\[download\]\s+(\d+\.\d+)%');
+        final sizeRegex = RegExp(r'of\s+(\d+\.\d+\w+)');
+        final speedRegex = RegExp(r'at\s+(\d+\.\d+\w+/s)');
+        final etaRegex = RegExp(r'ETA\s+(\d+:\d+)');
+
         final progressMatch = progressRegex.firstMatch(data);
         if (progressMatch != null) {
           task.progress = double.parse(progressMatch.group(1)!) / 100;
-          task.metadata = data.split('[download]')[1].trim();
+
+          final sizeMatch = sizeRegex.firstMatch(data);
+          if (sizeMatch != null) task.fileSize = sizeMatch.group(1)!;
+
+          final speedMatch = speedRegex.firstMatch(data);
+          if (speedMatch != null) task.speed = speedMatch.group(1)!;
+
+          final etaMatch = etaRegex.firstMatch(data);
+          if (etaMatch != null) task.eta = etaMatch.group(1)!;
+
+          task.metadata = "${task.fileSize} • ${task.speed} • ETA ${task.eta}";
         }
 
         task.update();
@@ -263,14 +349,17 @@ class DownloadController extends ChangeNotifier {
       if (exitCode == 0) {
         task.status = DownloadStatus.completed;
         task.progress = 1.0;
+        task.metadata = "Completed • ${task.fileSize}";
         return true;
       } else {
         task.status = DownloadStatus.error;
+        task.metadata = "Error (Exit code $exitCode)";
         return false;
       }
     } catch (e) {
       log.add('--- Download Error: $e ---');
       task.status = DownloadStatus.error;
+      task.metadata = "Error: $e";
       notifyListeners();
       return false;
     } finally {
@@ -281,6 +370,7 @@ class DownloadController extends ChangeNotifier {
   void removeTask(DownloadTask task) {
     task.process?.kill();
     tasks.remove(task);
+    saveHistory();
     notifyListeners();
   }
 }

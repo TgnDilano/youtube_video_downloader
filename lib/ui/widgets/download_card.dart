@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:ytdlapp/models/download_task.dart';
 
 class DownloadCard extends StatelessWidget {
@@ -18,7 +19,7 @@ class DownloadCard extends StatelessWidget {
     return ListenableBuilder(
       listenable: task,
       builder: (context, _) {
-        final cardContent = _buildCardContent();
+        final cardContent = _buildCardContent(context);
 
         if (task.isPlaylist) {
           return Card(
@@ -52,28 +53,45 @@ class DownloadCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCardContent() {
+  Widget _buildCardContent(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
           // Thumbnail
           if (!isChild)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: task.thumbnail.isNotEmpty
-                  ? Image.network(
-                      task.thumbnail,
-                      width: 140,
-                      height: 80,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      width: 140,
-                      height: 80,
-                      color: Colors.black,
-                      child: const Icon(Icons.movie),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: task.thumbnail.isNotEmpty
+                      ? Image.network(
+                          task.thumbnail,
+                          width: 140,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        )
+                      : Container(
+                          width: 140,
+                          height: 80,
+                          color: Colors.black,
+                          child: const Icon(Icons.movie),
+                        ),
+                ),
+                if (task.thumbnail.isNotEmpty)
+                  Positioned.fill(
+                    child: Center(
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.play_arrow,
+                          color: Colors.white,
+                          size: 40,
+                        ),
+                        onPressed: () => _launchUrl(task.url),
+                      ),
                     ),
+                  ),
+              ],
             ),
           if (!isChild) const SizedBox(width: 16),
 
@@ -88,9 +106,33 @@ class DownloadCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                Text(
-                  task.metadata,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                Row(
+                  children: [
+                    Text(
+                      task.metadata,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    if (task.resolution != "best") ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white10,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          task.resolution,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 8),
                 if (task.playlistProgress.isNotEmpty) ...[
@@ -100,9 +142,34 @@ class DownloadCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                 ],
+                if (task.status == DownloadStatus.downloading) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "${(task.progress * 100).toStringAsFixed(1)}%",
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.green,
+                        ),
+                      ),
+                      if (task.speed.isNotEmpty)
+                        Text(
+                          "${task.speed} • ETA ${task.eta}",
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                ],
                 LinearProgressIndicator(
                   value: task.progress,
-                  color: Colors.green,
+                  color: task.status == DownloadStatus.error
+                      ? Colors.red
+                      : Colors.green,
                   backgroundColor: Colors.white10,
                 ),
               ],
@@ -119,17 +186,50 @@ class DownloadCard extends StatelessWidget {
 
   Widget _buildTaskAction() {
     if (task.status == DownloadStatus.completed) {
-      return const Chip(
-        label: Text("Completed"),
-        backgroundColor: Colors.green,
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.folder_open, color: Colors.blue),
+            onPressed: () => _openFolder(task.savePath),
+            tooltip: "Open folder",
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            onPressed: onRemove,
+            tooltip: "Remove from history",
+          ),
+        ],
       );
     }
     if (task.status == DownloadStatus.error) {
-      return const Chip(label: Text("Error"), backgroundColor: Colors.red);
+      return IconButton(
+        icon: const Icon(Icons.refresh, color: Colors.orange),
+        onPressed: () {
+          // Retry logic could be added here
+        },
+        tooltip: "Retry",
+      );
     }
     return IconButton(
       icon: const Icon(Icons.close, color: Colors.red),
       onPressed: onRemove,
+      tooltip: "Cancel",
     );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri)) {
+      throw Exception('Could not launch $url');
+    }
+  }
+
+  Future<void> _openFolder(String? path) async {
+    if (path == null) return;
+    final uri = Uri.file(path);
+    if (!await launchUrl(uri)) {
+      // On some platforms file uri might fail, try opening the parent directory
+    }
   }
 }
