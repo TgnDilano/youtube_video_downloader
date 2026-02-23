@@ -22,13 +22,11 @@ class DownloadController extends ChangeNotifier {
       )
       .toList();
 
-  List<DownloadTask> get completedTasks => tasks
-      .where(
-        (t) =>
-            t.status == DownloadStatus.completed ||
-            t.status == DownloadStatus.error,
-      )
-      .toList();
+  List<DownloadTask> get completedTasks =>
+      tasks.where((t) => t.status == DownloadStatus.completed).toList();
+
+  List<DownloadTask> get failedTasks =>
+      tasks.where((t) => t.status == DownloadStatus.error).toList();
 
   Future<void> loadHistory() async {
     final prefs = await SharedPreferences.getInstance();
@@ -50,12 +48,14 @@ class DownloadController extends ChangeNotifier {
     final ytDlp = await _getBinaryPath('yt-dlp');
     try {
       final result = await Process.run(ytDlp, [
-        '--dump-json',
-        '--no-playlist',
+        '--dump-single-json',
+        '--flat-playlist',
         url,
       ]);
       if (result.exitCode == 0) {
-        return jsonDecode(result.stdout);
+        final output = result.stdout as String;
+        if (output.trim().isEmpty) return null;
+        return jsonDecode(output);
       }
     } catch (e) {
       log.add("Error fetching video info: $e");
@@ -82,6 +82,8 @@ class DownloadController extends ChangeNotifier {
         audioOnly,
         playlistStart: playlistStart,
         playlistEnd: playlistEnd,
+        playlistTitle: metadata?['title'],
+        resolution: resolution,
       );
     } else {
       final task = DownloadTask(
@@ -89,6 +91,7 @@ class DownloadController extends ChangeNotifier {
         url: url,
         resolution: resolution,
         savePath: savePath,
+        audioOnly: audioOnly,
       );
 
       if (metadata != null) {
@@ -114,50 +117,85 @@ class DownloadController extends ChangeNotifier {
     bool audioOnly, {
     int? playlistStart,
     int? playlistEnd,
+    String? playlistTitle,
+    String resolution = 'best',
   }) async {
+    String finalSavePath = savePath;
+    if (playlistTitle != null) {
+      final sanitized = playlistTitle
+          .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+          .trim();
+      final dir = Directory('$savePath/$sanitized');
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      finalSavePath = dir.path;
+    }
+
     final parentTask = DownloadTask(
       id: DateTime.now().toString(),
       url: url,
-      title: "Fetching playlist info...",
+      title: playlistTitle ?? "Fetching playlist info...",
       isPlaylist: true,
-      savePath: savePath,
+      savePath: finalSavePath,
     );
     tasks.insert(0, parentTask);
     notifyListeners();
 
     final ytDlp = await _getBinaryPath('yt-dlp');
     try {
-      final result = await Process.run(ytDlp, [
-        '--flat-playlist',
-        '--dump-json',
-        '--playlist-start',
-        (playlistStart ?? 1).toString(),
-        '--playlist-end',
-        (playlistEnd ?? 10).toString(),
-        url,
-      ]);
+      final args = ['--flat-playlist', '--dump-json', '--newline'];
 
-      if (result.exitCode == 0) {
-        final lines = (result.stdout as String)
-            .split('\n')
-            .where((line) => line.trim().isNotEmpty);
-        parentTask.title = "Playlist"; // Generic title for the parent
-        for (var line in lines) {
-          final data = jsonDecode(line);
-          final childTask = DownloadTask(
-            id: data['id'] ?? DateTime.now().toString(),
-            url: data['url'] ?? data['webpage_url'] ?? url,
-            title: data['title'] ?? 'Unknown Title',
-            metadata: "Queued",
-            savePath: savePath,
-          );
-          parentTask.children.add(childTask);
+      if (playlistStart != null) {
+        args.addAll(['--playlist-start', playlistStart.toString()]);
+      }
+      if (playlistEnd != null) {
+        args.addAll(['--playlist-end', playlistEnd.toString()]);
+      }
+
+      args.add(url);
+
+      final process = await Process.start(ytDlp, args);
+
+      process.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+            if (line.trim().isEmpty) return;
+            try {
+              final data = jsonDecode(line);
+              if (data['_type'] == 'playlist' ||
+                  data['_type'] == 'multi_video') {
+                parentTask.title = data['title'] ?? parentTask.title;
+              } else {
+                final childTask = DownloadTask(
+                  id: data['id'] ?? DateTime.now().toString(),
+                  url: data['url'] ?? data['webpage_url'] ?? url,
+                  title: data['title'] ?? 'Unknown Title',
+                  metadata: "Queued",
+                  savePath: finalSavePath,
+                  resolution: resolution,
+                  audioOnly: audioOnly,
+                );
+                parentTask.children.add(childTask);
+              }
+              parentTask.update();
+              notifyListeners();
+            } catch (e) {
+              log.add("Error parsing playlist item: $e");
+            }
+          });
+
+      final exitCode = await process.exitCode;
+
+      if (exitCode != 0) {
+        if (parentTask.children.isEmpty) {
+          parentTask.title = "Error fetching playlist (Code $exitCode)";
+          parentTask.status = DownloadStatus.error;
         }
-      } else {
-        parentTask.title = "Error fetching playlist";
-        parentTask.status = DownloadStatus.error;
       }
     } catch (e) {
+      log.add("Error starting playlist fetch: $e");
       parentTask.title = "Error fetching playlist";
       parentTask.status = DownloadStatus.error;
     }
@@ -165,7 +203,7 @@ class DownloadController extends ChangeNotifier {
     parentTask.update();
     notifyListeners();
     if (parentTask.status != DownloadStatus.error) {
-      _startDownload(parentTask, savePath, audioOnly);
+      _startDownload(parentTask, finalSavePath, audioOnly);
     }
   }
 
@@ -207,9 +245,14 @@ class DownloadController extends ChangeNotifier {
     if (task.isPlaylist) {
       task.status = DownloadStatus.downloading;
       task.update();
-      int completed = 0;
+      int completed = task.children
+          .where((c) => c.status == DownloadStatus.completed)
+          .length;
+
       for (var i = 0; i < task.children.length; i++) {
         final child = task.children[i];
+        if (child.status == DownloadStatus.completed) continue;
+
         child.metadata = "Preparing...";
         child.status = DownloadStatus.downloading;
         task.playlistProgress =
@@ -277,39 +320,69 @@ class DownloadController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final saveDir = Directory(savePath);
+      if (!await saveDir.exists()) {
+        await saveDir.create(recursive: true);
+      }
+    } catch (e) {
+      log.add("Failed to create/check directory: $savePath - $e");
+    }
+
+    try {
       task.process = await Process.start(ytDlp, args);
 
       final processCompleter = Completer<void>();
 
       void processOutput(String data, {bool isError = false}) {
-        if (isError)
+        if (isError) {
           log.add("ERROR: $data");
-        else
+        } else {
           log.add(data);
+        }
 
         task.liveOutput += data;
 
         // Better progress parsing
         // [download]  10.5% of 100.00MiB at 10.00MiB/s ETA 00:09
-        final progressRegex = RegExp(r'\[download\]\s+(\d+\.\d+)%');
-        final sizeRegex = RegExp(r'of\s+(\d+\.\d+\w+)');
-        final speedRegex = RegExp(r'at\s+(\d+\.\d+\w+/s)');
+        final progressRegex = RegExp(r'\[download\]\s+([\d\.]+)%');
+        final totalSizeRegex = RegExp(r'of\s+([\d\.]+[kMGTP]i?B)');
+        final downloadedSizeRegex = RegExp(
+          r'\[download\]\s+([\d\.]+[kMGTP]i?B)\s+of',
+        );
+        final speedRegex = RegExp(r'at\s+([\d\.]+[kMGTP]i?B/s)');
         final etaRegex = RegExp(r'ETA\s+(\d+:\d+)');
 
         final progressMatch = progressRegex.firstMatch(data);
         if (progressMatch != null) {
           task.progress = double.parse(progressMatch.group(1)!) / 100;
+        }
 
-          final sizeMatch = sizeRegex.firstMatch(data);
-          if (sizeMatch != null) task.fileSize = sizeMatch.group(1)!;
+        final sizeMatch = totalSizeRegex.firstMatch(data);
+        if (sizeMatch != null) task.fileSize = sizeMatch.group(1)!;
 
-          final speedMatch = speedRegex.firstMatch(data);
-          if (speedMatch != null) task.speed = speedMatch.group(1)!;
+        final downloadedMatch = downloadedSizeRegex.firstMatch(data);
+        if (downloadedMatch != null) {
+          task.downloadedSize = downloadedMatch.group(1)!;
+        }
 
-          final etaMatch = etaRegex.firstMatch(data);
-          if (etaMatch != null) task.eta = etaMatch.group(1)!;
+        final speedMatch = speedRegex.firstMatch(data);
+        if (speedMatch != null) task.speed = speedMatch.group(1)!;
 
-          task.metadata = "${task.fileSize} • ${task.speed} • ETA ${task.eta}";
+        final etaMatch = etaRegex.firstMatch(data);
+        if (etaMatch != null) task.eta = etaMatch.group(1)!;
+
+        if (task.fileSize.isNotEmpty) {
+          String display = "";
+          if (task.downloadedSize.isNotEmpty) {
+            display += "${task.downloadedSize} / ";
+          }
+          display += task.fileSize;
+          if (task.speed.isNotEmpty) display += " • ${task.speed}";
+          if (task.eta.isNotEmpty) display += " • ETA ${task.eta}";
+          task.metadata = display;
+        } else {
+          task.metadata =
+              "Downloading... ${(task.progress * 100).toStringAsFixed(1)}%";
         }
 
         task.update();
@@ -359,7 +432,7 @@ class DownloadController extends ChangeNotifier {
     } catch (e) {
       log.add('--- Download Error: $e ---');
       task.status = DownloadStatus.error;
-      task.metadata = "Error: $e";
+      task.metadata = "Critical Error: $e";
       notifyListeners();
       return false;
     } finally {
@@ -369,7 +442,48 @@ class DownloadController extends ChangeNotifier {
 
   void removeTask(DownloadTask task) {
     task.process?.kill();
-    tasks.remove(task);
+    // Check if it's a child task
+    bool removed = tasks.remove(task);
+    if (!removed) {
+      // Search in playlist children
+      for (var t in tasks) {
+        if (t.isPlaylist) {
+          if (t.children.remove(task)) {
+            t.update();
+            break;
+          }
+        }
+      }
+    }
+    saveHistory();
+    notifyListeners();
+  }
+
+  void retryTask(DownloadTask task) {
+    if (task.status != DownloadStatus.error &&
+        !(task.isPlaylist &&
+            task.children.any((c) => c.status == DownloadStatus.error))) {
+      return;
+    }
+
+    if (!task.isPlaylist) {
+      task.status = DownloadStatus.queued;
+      task.progress = 0.0;
+      task.metadata = "Retrying...";
+      task.update();
+    }
+
+    _startDownload(task, task.savePath ?? "", task.audioOnly);
+    notifyListeners();
+  }
+
+  void clearAllHistory() {
+    // Only remove completed/error tasks
+    tasks.removeWhere(
+      (t) =>
+          t.status == DownloadStatus.completed ||
+          t.status == DownloadStatus.error,
+    );
     saveHistory();
     notifyListeners();
   }

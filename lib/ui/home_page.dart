@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:ytdlapp/controllers/download_controller.dart';
@@ -7,6 +8,7 @@ import 'package:ytdlapp/ui/widgets/download_card.dart';
 import 'package:ytdlapp/ui/widgets/input_area.dart';
 import 'package:ytdlapp/ui/widgets/terminal_view.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:ytdlapp/models/download_task.dart';
 
 class TubemateClone extends StatefulWidget {
   const TubemateClone({super.key});
@@ -25,7 +27,7 @@ class _TubemateCloneState extends State<TubemateClone> {
 
   String? _selectedPath;
   bool _isAudioOnly = false;
-  bool _isPlaylist = false;
+  bool _downloadFullPlaylist = true;
   bool _showTerminal = false;
   int _selectedIndex = 0;
 
@@ -33,6 +35,7 @@ class _TubemateCloneState extends State<TubemateClone> {
   Map<String, dynamic>? _currentPreview;
   bool _isFetchingPreview = false;
   String _selectedResolution = "best";
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -56,9 +59,13 @@ class _TubemateCloneState extends State<TubemateClone> {
     final url = _urlController.text.trim();
     if (url.isNotEmpty && _settings.isAutoPreviewEnabled) {
       if (_currentPreview == null || _currentPreview!['webpage_url'] != url) {
-        _fetchPreview(url);
+        _debounce?.cancel();
+        _debounce = Timer(const Duration(milliseconds: 500), () {
+          _fetchPreview(url);
+        });
       }
     } else if (url.isEmpty) {
+      _debounce?.cancel();
       setState(() => _currentPreview = null);
     }
   }
@@ -84,6 +91,7 @@ class _TubemateCloneState extends State<TubemateClone> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _urlController.dispose();
     _playlistStartController.dispose();
     _playlistEndController.dispose();
@@ -102,12 +110,16 @@ class _TubemateCloneState extends State<TubemateClone> {
             onDestinationSelected: (idx) =>
                 setState(() => _selectedIndex = idx),
             labelType: NavigationRailLabelType.all,
-            leading: const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Icon(
-                Icons.play_circle_fill,
-                color: Colors.green,
-                size: 40,
+            leading: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/app_icon.png',
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
             destinations: const [
@@ -168,13 +180,7 @@ class _TubemateCloneState extends State<TubemateClone> {
         // Input Section
         InputArea(
           urlController: _urlController,
-          playlistStartController: _playlistStartController,
-          playlistEndController: _playlistEndController,
           selectedPath: _selectedPath ?? _settings.defaultDownloadPath,
-          isAudioOnly: _isAudioOnly,
-          isPlaylist: _isPlaylist,
-          onAudioOnlyChanged: (value) => setState(() => _isAudioOnly = value),
-          onPlaylistChanged: (value) => setState(() => _isPlaylist = value),
           onSelectFolder: () async {
             String? path = await FilePicker.platform.getDirectoryPath();
             if (path != null) setState(() => _selectedPath = path);
@@ -188,7 +194,7 @@ class _TubemateCloneState extends State<TubemateClone> {
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
 
-        if (_currentPreview != null && !_isPlaylist) _buildPreviewCard(),
+        if (_currentPreview != null) _buildPreviewCard(),
 
         const SizedBox(height: 32),
 
@@ -196,20 +202,34 @@ class _TubemateCloneState extends State<TubemateClone> {
         Expanded(
           flex: _showTerminal ? 2 : 1,
           child: DefaultTabController(
-            length: 2,
+            length: 3,
             child: Column(
               children: [
-                const TabBar(
-                  tabs: [
-                    Tab(text: "Downloading"),
-                    Tab(text: "History"),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: TabBar(
+                        tabs: [
+                          Tab(text: "Downloading"),
+                          Tab(text: "History"),
+                          Tab(text: "Failed"),
+                        ],
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _controller.clearAllHistory(),
+                      icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                      label: const Text("Clear All"),
+                      style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                    ),
                   ],
                 ),
                 Expanded(
                   child: TabBarView(
                     children: [
-                      _buildTaskList(_controller.downloadingTasks),
-                      _buildTaskList(_controller.completedTasks),
+                      _buildTaskList(filter: "downloading"),
+                      _buildTaskList(filter: "completed"),
+                      _buildTaskList(filter: "failed"),
                     ],
                   ),
                 ),
@@ -230,8 +250,19 @@ class _TubemateCloneState extends State<TubemateClone> {
 
   Widget _buildPreviewCard() {
     final info = _currentPreview!;
+    final bool isPlaylist = info['_type'] == 'playlist';
+
+    // Extract best thumbnail
+    String? thumbnailUrl = info['thumbnail'];
+    if (thumbnailUrl == null && info['thumbnails'] != null) {
+      final List thumbs = info['thumbnails'];
+      if (thumbs.isNotEmpty) {
+        thumbnailUrl = thumbs.last['url'];
+      }
+    }
+
     List<int> heights = [];
-    if (info['formats'] != null) {
+    if (!isPlaylist && info['formats'] != null) {
       for (var f in info['formats']) {
         if (f['height'] != null && f['vcodec'] != 'none') {
           int h = f['height'];
@@ -240,7 +271,7 @@ class _TubemateCloneState extends State<TubemateClone> {
       }
     }
     heights.sort((a, b) => b.compareTo(a));
-    // Limit to common resolutions for the selector
+    // Limit to common resolutions
     final displayHeights = heights.take(5).toList();
 
     return Container(
@@ -258,7 +289,7 @@ class _TubemateCloneState extends State<TubemateClone> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.network(
-                  info['thumbnail'] ?? "",
+                  thumbnailUrl ?? "",
                   width: 120,
                   height: 68,
                   fit: BoxFit.cover,
@@ -278,7 +309,9 @@ class _TubemateCloneState extends State<TubemateClone> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      "${info['uploader'] ?? ''} • ${info['duration_string'] ?? ''}",
+                      isPlaylist
+                          ? "Playlist • ${info['entries']?.length ?? info['n_entries'] ?? 'multiple'} items"
+                          : "${info['uploader'] ?? ''} • ${info['duration_string'] ?? ''}",
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   ],
@@ -286,16 +319,91 @@ class _TubemateCloneState extends State<TubemateClone> {
               ),
               IconButton(
                 icon: const Icon(Icons.open_in_new, size: 20),
-                onPressed: () => launchUrl(Uri.parse(info['webpage_url'])),
+                onPressed: () =>
+                    launchUrl(Uri.parse(info['webpage_url'] ?? info['url'])),
               ),
             ],
           ),
-          if (!_isAudioOnly) ...[
+
+          if (isPlaylist) ...[
+            const Divider(height: 32, color: Colors.white10),
+            Row(
+              children: [
+                const Text("Full Playlist", style: TextStyle(fontSize: 13)),
+                Checkbox(
+                  value: _downloadFullPlaylist,
+                  onChanged: (v) =>
+                      setState(() => _downloadFullPlaylist = v ?? true),
+                  activeColor: Colors.green,
+                ),
+                const SizedBox(width: 16),
+                if (!_downloadFullPlaylist) ...[
+                  const Text(
+                    "Range:",
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 60,
+                    child: TextField(
+                      controller: _playlistStartController,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        hintText: "1",
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Text("to"),
+                  ),
+                  SizedBox(
+                    width: 60,
+                    child: TextField(
+                      controller: _playlistEndController,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        hintText: "10",
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                const Text("Audio Only", style: TextStyle(fontSize: 13)),
+                Switch(
+                  value: _isAudioOnly,
+                  onChanged: (v) => setState(() => _isAudioOnly = v),
+                  activeThumbColor: Colors.green,
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: _startNewDownload,
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text("Download"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
             const Divider(height: 32, color: Colors.white10),
             Row(
               children: [
                 const Text(
-                  "Resolution:",
+                  "Format:",
                   style: TextStyle(fontSize: 13, color: Colors.grey),
                 ),
                 const SizedBox(width: 16),
@@ -310,12 +418,35 @@ class _TubemateCloneState extends State<TubemateClone> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _buildResolutionChip("best", "Best"),
+                          _buildResolutionChip("audio", "Audio (MP3)"),
+                          const VerticalDivider(
+                            width: 16,
+                            color: Colors.white10,
+                            thickness: 1,
+                          ),
+                          _buildResolutionChip("best", "Best Video"),
                           ...displayHeights.map(
                             (h) => _buildResolutionChip(h.toString(), "${h}p"),
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: _startNewDownload,
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text("Download"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                 ),
@@ -330,7 +461,12 @@ class _TubemateCloneState extends State<TubemateClone> {
   Widget _buildResolutionChip(String value, String label) {
     bool isSelected = _selectedResolution == value;
     return GestureDetector(
-      onTap: () => setState(() => _selectedResolution = value),
+      onTap: () {
+        setState(() {
+          _selectedResolution = value;
+          _isAudioOnly = value == "audio";
+        });
+      },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 4),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -350,16 +486,28 @@ class _TubemateCloneState extends State<TubemateClone> {
     );
   }
 
-  Widget _buildTaskList(List tasks) {
+  Widget _buildTaskList({required String filter}) {
     return ListenableBuilder(
       listenable: _controller,
-      builder: (context, _) => ListView.builder(
-        itemCount: tasks.length,
-        itemBuilder: (context, index) => DownloadCard(
-          task: tasks[index],
-          onRemove: () => _controller.removeTask(tasks[index]),
-        ),
-      ),
+      builder: (context, _) {
+        List<DownloadTask> tasks;
+        if (filter == "downloading") {
+          tasks = _controller.downloadingTasks;
+        } else if (filter == "completed") {
+          tasks = _controller.completedTasks;
+        } else {
+          tasks = _controller.failedTasks;
+        }
+
+        return ListView.builder(
+          itemCount: tasks.length,
+          itemBuilder: (context, index) => DownloadCard(
+            task: tasks[index],
+            onRemove: () => _controller.removeTask(tasks[index]),
+            onRetry: () => _controller.retryTask(tasks[index]),
+          ),
+        );
+      },
     );
   }
 
@@ -375,9 +523,13 @@ class _TubemateCloneState extends State<TubemateClone> {
     final String url = _urlController.text.trim();
     if (url.isEmpty) return;
 
-    if (_isPlaylist) {
-      final int? start = int.tryParse(_playlistStartController.text);
-      final int? end = int.tryParse(_playlistEndController.text);
+    if (_currentPreview != null && _currentPreview!['_type'] == 'playlist') {
+      final int? start = _downloadFullPlaylist
+          ? null
+          : int.tryParse(_playlistStartController.text);
+      final int? end = _downloadFullPlaylist
+          ? null
+          : int.tryParse(_playlistEndController.text);
 
       _controller.addDownload(
         url,
@@ -386,23 +538,26 @@ class _TubemateCloneState extends State<TubemateClone> {
         isPlaylist: true,
         playlistStart: start,
         playlistEnd: end,
+        metadata:
+            _currentPreview, // Pass metadata to include title for subfolder
       );
     } else {
-      if (_currentPreview == null) {
-        // Fallback if preview isn't fetched yet
-        _controller.addDownload(url, path, _isAudioOnly);
-      } else {
-        _controller.addDownload(
-          url,
-          path,
-          _isAudioOnly,
-          metadata: _currentPreview,
-          resolution: _selectedResolution,
-        );
-      }
+      _controller.addDownload(
+        url,
+        path,
+        _selectedResolution == "audio",
+        metadata: _currentPreview,
+        resolution: _selectedResolution == "audio"
+            ? "best"
+            : _selectedResolution,
+      );
     }
 
     _urlController.clear();
-    setState(() => _currentPreview = null);
+    setState(() {
+      _currentPreview = null;
+      _isAudioOnly = false;
+      _selectedResolution = _settings.defaultResolution;
+    });
   }
 }

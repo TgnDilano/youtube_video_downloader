@@ -25,6 +25,8 @@ class DownloadTask extends ChangeNotifier {
   String speed;
   String eta;
   String fileSize;
+  String downloadedSize;
+  bool audioOnly;
 
   DownloadTask({
     required this.id,
@@ -41,6 +43,8 @@ class DownloadTask extends ChangeNotifier {
     this.speed = "",
     this.eta = "",
     this.fileSize = "",
+    this.downloadedSize = "",
+    this.audioOnly = false,
   }) : timestamp = timestamp ?? DateTime.now();
 
   void update() => notifyListeners();
@@ -59,6 +63,8 @@ class DownloadTask extends ChangeNotifier {
       'savePath': savePath,
       'timestamp': timestamp.toIso8601String(),
       'fileSize': fileSize,
+      'downloadedSize': downloadedSize,
+      'audioOnly': audioOnly,
     };
   }
 
@@ -76,6 +82,8 @@ class DownloadTask extends ChangeNotifier {
       savePath: json['savePath'],
       timestamp: DateTime.parse(json['timestamp']),
       fileSize: json['fileSize'] ?? "",
+      downloadedSize: json['downloadedSize'] ?? "",
+      audioOnly: json['audioOnly'] ?? false,
     );
   }
 }

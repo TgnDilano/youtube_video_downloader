@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsController extends ChangeNotifier {
@@ -18,6 +19,16 @@ class SettingsController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _defaultResolution = prefs.getString('default_resolution') ?? 'best';
     _defaultDownloadPath = prefs.getString('default_download_path');
+
+    if (_defaultDownloadPath == null) {
+      try {
+        final directory = await getDownloadsDirectory();
+        _defaultDownloadPath = directory?.path;
+      } catch (e) {
+        debugPrint("Could not fetch downloads directory: $e");
+      }
+    }
+
     _isAutoPreviewEnabled = prefs.getBool('auto_preview') ?? true;
     notifyListeners();
   }

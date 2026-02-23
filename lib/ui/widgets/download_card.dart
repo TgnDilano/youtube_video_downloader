@@ -5,12 +5,14 @@ import 'package:ytdlapp/models/download_task.dart';
 class DownloadCard extends StatelessWidget {
   final DownloadTask task;
   final VoidCallback onRemove;
+  final VoidCallback? onRetry;
   final bool isChild;
 
   const DownloadCard({
     super.key,
     required this.task,
     required this.onRemove,
+    this.onRetry,
     this.isChild = false,
   });
 
@@ -31,9 +33,8 @@ class DownloadCard extends StatelessWidget {
                   .map(
                     (childTask) => DownloadCard(
                       task: childTask,
-                      onRemove: () {
-                        // Child removal can be complex, disable for now
-                      },
+                      onRemove: onRemove,
+                      onRetry: onRetry,
                       isChild: true,
                     ),
                   )
@@ -205,9 +206,7 @@ class DownloadCard extends StatelessWidget {
     if (task.status == DownloadStatus.error) {
       return IconButton(
         icon: const Icon(Icons.refresh, color: Colors.orange),
-        onPressed: () {
-          // Retry logic could be added here
-        },
+        onPressed: onRetry,
         tooltip: "Retry",
       );
     }

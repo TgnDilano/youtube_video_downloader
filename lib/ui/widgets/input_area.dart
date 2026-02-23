@@ -2,26 +2,14 @@ import 'package:flutter/material.dart';
 
 class InputArea extends StatelessWidget {
   final TextEditingController urlController;
-  final TextEditingController playlistStartController;
-  final TextEditingController playlistEndController;
   final String? selectedPath;
-  final bool isAudioOnly;
-  final bool isPlaylist;
-  final ValueChanged<bool> onAudioOnlyChanged;
-  final ValueChanged<bool> onPlaylistChanged;
   final VoidCallback onSelectFolder;
   final VoidCallback onStartDownload;
 
   const InputArea({
     super.key,
     required this.urlController,
-    required this.playlistStartController,
-    required this.playlistEndController,
     required this.selectedPath,
-    required this.isAudioOnly,
-    required this.isPlaylist,
-    required this.onAudioOnlyChanged,
-    required this.onPlaylistChanged,
     required this.onSelectFolder,
     required this.onStartDownload,
   });
@@ -39,18 +27,11 @@ class InputArea extends StatelessWidget {
         children: [
           TextField(
             controller: urlController,
-            decoration: InputDecoration(
+            onSubmitted: (_) => onStartDownload(),
+            decoration: const InputDecoration(
               hintText: "Insert or Paste URL Here",
               border: InputBorder.none,
-              prefixIcon: const Icon(Icons.link),
-              suffixIcon: ElevatedButton(
-                onPressed: onStartDownload,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text("Convert"),
-              ),
+              prefixIcon: Icon(Icons.link),
             ),
           ),
           const Divider(color: Colors.white10),
@@ -61,55 +42,8 @@ class InputArea extends StatelessWidget {
                 icon: const Icon(Icons.folder_open),
                 label: Text(selectedPath ?? "Select Folder"),
               ),
-              const Spacer(),
-              const Text("Audio Only"),
-              Switch(value: isAudioOnly, onChanged: onAudioOnlyChanged),
-              const SizedBox(width: 16),
-              const Text("Playlist"),
-              Switch(value: isPlaylist, onChanged: onPlaylistChanged),
             ],
           ),
-          if (isPlaylist) ...[
-            const Divider(color: Colors.white10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const Text("Range: "),
-                  Flexible(
-                    child: SizedBox(
-                      width: 80,
-                      child: TextField(
-                        controller: playlistStartController,
-                        textAlign: TextAlign.center,
-                        decoration: const InputDecoration(
-                          hintText: "Start",
-                          isDense: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ),
-                  const Text(" to "),
-                  Flexible(
-                    child: SizedBox(
-                      width: 80,
-                      child: TextField(
-                        controller: playlistEndController,
-                        textAlign: TextAlign.center,
-                        decoration: const InputDecoration(
-                          hintText: "End",
-                          isDense: true,
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
