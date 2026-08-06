@@ -39,6 +39,7 @@ dependencies:
   shared_preferences: ^2.2.2
   url_launcher: ^6.2.5
   google_fonts: ^8.2.1
+  window_manager: ^0.5.2
 
 dev_dependencies:
   flutter_test:
