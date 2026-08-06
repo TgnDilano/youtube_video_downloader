@@ -43,13 +43,17 @@ class DownloadController extends ChangeNotifier {
     await prefs.setStringList('download_history', historyJson);
   }
 
-  Future<Map<String, dynamic>?> fetchVideoInfo(String url) async {
+  Future<Map<String, dynamic>?> fetchVideoInfo(
+    String url, {
+    bool flatPlaylist = true,
+  }) async {
     if (url.isEmpty) return null;
     final ytDlp = await _getBinaryPath('yt-dlp');
     try {
       final result = await Process.run(ytDlp, [
         '--dump-single-json',
-        '--flat-playlist',
+        if (flatPlaylist) '--flat-playlist',
+        if (!flatPlaylist) '--no-playlist',
         url,
       ]);
       if (result.exitCode == 0) {
@@ -72,6 +76,7 @@ class DownloadController extends ChangeNotifier {
     int? playlistEnd,
     String? playlistItems,
     String resolution = "best",
+    Map<String, String>? itemResolutions,
     Map<String, dynamic>? metadata,
   }) async {
     if (url.isEmpty) return;
@@ -86,6 +91,7 @@ class DownloadController extends ChangeNotifier {
         playlistItems: playlistItems,
         playlistTitle: metadata?['title'],
         resolution: resolution,
+        itemResolutions: itemResolutions,
       );
     } else {
       final task = DownloadTask(
@@ -122,6 +128,7 @@ class DownloadController extends ChangeNotifier {
     String? playlistItems,
     String? playlistTitle,
     String resolution = 'best',
+    Map<String, String>? itemResolutions,
   }) async {
     String finalSavePath = savePath;
     if (playlistTitle != null) {
@@ -163,6 +170,7 @@ class DownloadController extends ChangeNotifier {
 
       final process = await Process.start(ytDlp, args);
 
+      var streamIndex = 0;
       process.stdout
           .transform(utf8.decoder)
           .transform(const LineSplitter())
@@ -174,14 +182,18 @@ class DownloadController extends ChangeNotifier {
                   data['_type'] == 'multi_video') {
                 parentTask.title = data['title'] ?? parentTask.title;
               } else {
+                streamIndex++;
+                final listIndex = data['playlist_index'] ?? streamIndex;
+                final itemRes =
+                    itemResolutions?['$listIndex'] ?? resolution;
                 final childTask = DownloadTask(
                   id: data['id'] ?? DateTime.now().toString(),
                   url: data['url'] ?? data['webpage_url'] ?? url,
                   title: data['title'] ?? 'Unknown Title',
                   metadata: "Queued",
                   savePath: finalSavePath,
-                  resolution: resolution,
-                  audioOnly: audioOnly,
+                  resolution: itemRes == 'audio' ? 'best' : itemRes,
+                  audioOnly: audioOnly || itemRes == 'audio',
                 );
                 parentTask.children.add(childTask);
               }
@@ -265,7 +277,11 @@ class DownloadController extends ChangeNotifier {
             "Downloading video ${i + 1} of ${task.children.length}";
         task.update();
 
-        final success = await _executeDownload(child, savePath, audioOnly);
+        final success = await _executeDownload(
+          child,
+          savePath,
+          child.audioOnly,
+        );
 
         if (success) {
           completed++;
