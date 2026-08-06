@@ -1,0 +1,66 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#26221C"/>
+      <stop offset="55%" stop-color="#1A1712"/>
+      <stop offset="100%" stop-color="#100E0B"/>
+    </linearGradient>
+
+    <radialGradient id="glow" cx="50%" cy="38%" r="60%">
+      <stop offset="0%" stop-color="#FF9A54" stop-opacity="0.28"/>
+      <stop offset="45%" stop-color="#FF8A3D" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#FF8A3D" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFB067"/>
+      <stop offset="55%" stop-color="#FF8A3D"/>
+      <stop offset="100%" stop-color="#E56A22"/>
+    </linearGradient>
+
+    <linearGradient id="sheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="40%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <clipPath id="squircle">
+      <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#squircle)">
+    <rect width="1024" height="1024" fill="url(#bg)"/>
+
+    <!-- subtle vertical tape-line texture, matching sidebar chrome -->
+    <g opacity="0.5">
+      <rect width="1024" height="1024" fill="url(#glow)"/>
+    </g>
+    <g opacity="0.035">
+      <rect y="0" width="1024" height="1" fill="#FFFFFF"/>
+      <rect y="8" width="1024" height="1" fill="#FFFFFF"/>
+      <rect y="16" width="1024" height="1" fill="#FFFFFF"/>
+    </g>
+
+    <!-- faint outer dashed orbit ring, echoing the in-app logo mark -->
+    <circle cx="512" cy="512" r="336" fill="none" stroke="#7A4A26" stroke-width="4" stroke-dasharray="4 22" opacity="0.55"/>
+
+    <!-- main ring -->
+    <circle cx="512" cy="512" r="248" fill="none" stroke="url(#ring)" stroke-width="40"/>
+
+    <!-- reel hub ticks, top and bottom of the ring -->
+    <circle cx="512" cy="240" r="15" fill="#FF8A3D"/>
+    <circle cx="512" cy="784" r="15" fill="#FF8A3D"/>
+
+    <!-- checkmark / capture-complete glyph, centered -->
+    <path d="M400 520 L472 592 L636 428"
+          fill="none" stroke="#F2EDE4" stroke-width="52"
+          stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- top gloss -->
+    <rect width="1024" height="1024" fill="url(#sheen)"/>
+
+    <!-- inner hairline border for panel depth -->
+    <rect x="6" y="6" width="1012" height="1012" rx="222" ry="222"
+          fill="none" stroke="#000000" stroke-opacity="0.35" stroke-width="3"/>
+  </g>
+</svg>

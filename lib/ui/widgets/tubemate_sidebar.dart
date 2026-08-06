@@ -119,7 +119,7 @@ class TubemateSidebar extends StatelessWidget {
               RotatedBox(
                 quarterTurns: 1,
                 child: Text(
-                  'TUBEMATE v2 · MEDIA TRANSPORT',
+                  'TUBEXMATE v2 · MEDIA TRANSPORT',
                   maxLines: 1,
                   textAlign: TextAlign.center,
                   style: TText.mono(

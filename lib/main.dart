@@ -51,7 +51,7 @@ class TubemateApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Tubemate',
+      title: 'TubeXMate',
       theme: buildTubemateTheme(context),
       home: const TubemateClone(),
     );

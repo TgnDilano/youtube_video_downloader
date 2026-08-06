@@ -11,7 +11,7 @@ void main() {
     await tester.pumpWidget(const TubemateApp());
     await tester.pump();
 
-    expect(find.text('Tubemate'), findsOneWidget);
+    expect(find.text('TubeXMate'), findsOneWidget);
     expect(find.text('HOME'), findsOneWidget);
     expect(find.text('SETTINGS'), findsOneWidget);
     expect(tester.takeException(), isNull);

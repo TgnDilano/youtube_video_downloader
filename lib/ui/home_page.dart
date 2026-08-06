@@ -243,7 +243,7 @@ class _TubemateCloneState extends State<TubemateClone> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Tubemate',
+                      'TubeXMate',
                       style: TText.display(context, size: 30),
                     ),
                     const SizedBox(height: 6),
