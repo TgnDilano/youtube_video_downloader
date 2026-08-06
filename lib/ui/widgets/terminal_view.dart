@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ytdlapp/controllers/download_controller.dart';
+import 'package:ytdlapp/ui/app_theme.dart';
 
 class TerminalView extends StatefulWidget {
   final DownloadController controller;
@@ -24,18 +25,17 @@ class _TerminalViewState extends State<TerminalView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
-        const Text(
-          "Terminal",
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        Text(
+          'Terminal',
+          style: TText.display(context, size: 16, weight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Expanded(
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(8),
+              color: TColors.jackBg,
+              border: Border.all(color: TColors.line),
             ),
             child: ListenableBuilder(
               listenable: widget.controller,
@@ -51,11 +51,15 @@ class _TerminalViewState extends State<TerminalView> {
                   controller: _scrollController,
                   itemCount: widget.controller.log.length,
                   itemBuilder: (context, index) {
+                    final line = widget.controller.log[index];
+                    final isError = line.startsWith('ERROR:') ||
+                        line.contains('Error');
                     return Text(
-                      widget.controller.log[index],
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
+                      line,
+                      style: TText.mono(
+                        context,
+                        size: 11.5,
+                        color: isError ? TColors.red : TColors.textMuted,
                       ),
                     );
                   },

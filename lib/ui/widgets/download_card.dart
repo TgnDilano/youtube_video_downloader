@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ytdlapp/models/download_task.dart';
+import 'package:ytdlapp/ui/app_theme.dart';
 
-class DownloadCard extends StatelessWidget {
+/// Queue item styled after the cassette-reel design:
+/// spinning reel, mono meta, VU meter, timecode.
+class DownloadCard extends StatefulWidget {
   final DownloadTask task;
   final VoidCallback onRemove;
   final VoidCallback? onRetry;
@@ -17,218 +20,405 @@ class DownloadCard extends StatelessWidget {
   });
 
   @override
+  State<DownloadCard> createState() => _DownloadCardState();
+}
+
+class _DownloadCardState extends State<DownloadCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spinController;
+
+  DownloadTask get task => widget.task;
+
+  @override
+  void initState() {
+    super.initState();
+    final seed = (task.id.hashCode % 10).abs();
+    _spinController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 3000 + seed * 250),
+    );
+    task.addListener(_onTaskChanged);
+    _syncAnimation();
+  }
+
+  void _onTaskChanged() {
+    if (!mounted) return;
+    _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (task.status == DownloadStatus.downloading) {
+      if (!_spinController.isAnimating) _spinController.repeat();
+    } else {
+      _spinController.stop();
+      _spinController.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    task.removeListener(_onTaskChanged);
+    _spinController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: task,
       builder: (context, _) {
-        final cardContent = _buildCardContent(context);
-
+        final content = _buildRow(context);
         if (task.isPlaylist) {
-          return Card(
-            color: const Color(0xFF1E1E1E),
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ExpansionTile(
-              title: cardContent,
-              children: task.children
-                  .map(
-                    (childTask) => DownloadCard(
-                      task: childTask,
-                      onRemove: onRemove,
-                      onRetry: onRetry,
-                      isChild: true,
-                    ),
-                  )
-                  .toList(),
+          return Container(
+            decoration: BoxDecoration(
+              color: TColors.panel2,
+              border: Border.all(color: TColors.line),
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: TColors.lineSoft,
+              ),
+              child: ExpansionTile(
+                initiallyExpanded: true,
+                tilePadding: const EdgeInsets.symmetric(horizontal: 18),
+                childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+                iconColor: TColors.textDim,
+                collapsedIconColor: TColors.textDim,
+                shape: const Border(),
+                collapsedShape: const Border(),
+                title: content,
+                children: task.children
+                    .map(
+                      (childTask) => Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: DownloadCard(
+                          task: childTask,
+                          onRemove: widget.onRemove,
+                          onRetry: widget.onRetry,
+                          isChild: true,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
           );
-        } else {
-          return Card(
-            color: isChild ? const Color(0xFF282828) : const Color(0xFF1E1E1E),
-            margin: isChild
-                ? const EdgeInsets.fromLTRB(16, 0, 16, 8)
-                : const EdgeInsets.only(bottom: 12),
-            child: cardContent,
-          );
         }
+        return Container(
+          decoration: BoxDecoration(
+            color: TColors.panel2,
+            border: Border.all(color: TColors.line),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            child: content,
+          ),
+        );
       },
     );
   }
 
-  Widget _buildCardContent(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          // Thumbnail
-          if (!isChild)
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: task.thumbnail.isNotEmpty
-                      ? Image.network(
-                          task.thumbnail,
-                          width: 140,
-                          height: 80,
-                          fit: BoxFit.cover,
-                        )
-                      : Container(
-                          width: 140,
-                          height: 80,
-                          color: Colors.black,
-                          child: const Icon(Icons.movie),
-                        ),
-                ),
-                if (task.thumbnail.isNotEmpty)
-                  Positioned.fill(
-                    child: Center(
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.play_arrow,
-                          color: Colors.white,
-                          size: 40,
-                        ),
-                        onPressed: () => _launchUrl(task.url),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          if (!isChild) const SizedBox(width: 16),
-
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Row(
-                  children: [
-                    Text(
-                      task.metadata,
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                    if (task.resolution != "best") ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          task.resolution,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (task.playlistProgress.isNotEmpty) ...[
-                  Text(
-                    task.playlistProgress,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                if (task.status == DownloadStatus.downloading) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "${(task.progress * 100).toStringAsFixed(1)}%",
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.green,
-                        ),
-                      ),
-                      if (task.speed.isNotEmpty)
-                        Text(
-                          "${task.speed} • ETA ${task.eta}",
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                ],
-                LinearProgressIndicator(
-                  value: task.progress,
-                  color: task.status == DownloadStatus.error
-                      ? Colors.red
-                      : Colors.green,
-                  backgroundColor: Colors.white10,
-                ),
-              ],
-            ),
+  Widget _buildRow(BuildContext context) {
+    return Row(
+      children: [
+        _StatusIndicator(
+          task: task,
+          spin: _spinController,
+          size: widget.isChild ? 24 : 34,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                task.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TText.body(context, size: 13.5),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                _metaLine(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TText.mono(context, size: 10.5, color: TColors.textDim),
+              ),
+            ],
           ),
+        ),
+        const SizedBox(width: 16),
+        if (!widget.isChild) ...[
+          VuMeter(progress: task.progress),
           const SizedBox(width: 16),
-
-          // Status/Action
-          if (!isChild) _buildTaskAction(),
         ],
+        if (widget.isChild)
+          Text(
+            _timecode(),
+            style: TText.mono(context, size: 11, color: TColors.textMuted),
+          )
+        else
+          _buildActions(context),
+      ],
+    );
+  }
+
+  String _metaLine() {
+    if (task.isPlaylist) {
+      final base =
+          'Playlist · ${task.children.isEmpty ? '…' : task.children.length.toString()} items';
+      if (task.playlistProgress.isNotEmpty) {
+        return '${task.playlistProgress} · $base';
+      }
+      return base;
+    }
+    final res = task.audioOnly
+        ? 'Audio'
+        : task.resolution == 'best'
+            ? 'Best'
+            : '${task.resolution}p';
+    final fmt = task.audioOnly ? 'MP3' : 'MP4';
+    final pct = switch (task.status) {
+      DownloadStatus.completed => 'Done',
+      DownloadStatus.error => 'Failed',
+      DownloadStatus.downloading =>
+        '${(task.progress * 100).clamp(0, 100).round()}%',
+      DownloadStatus.queued => 'Queued',
+    };
+    return '$res · $fmt · $pct';
+  }
+
+  String _timecode() {
+    if (task.status == DownloadStatus.downloading) {
+      if (task.downloadedSize.isNotEmpty && task.fileSize.isNotEmpty) {
+        return '${task.downloadedSize} / ${task.fileSize}';
+      }
+      if (task.eta.isNotEmpty) return 'ETA ${task.eta}';
+      return '${(task.progress * 100).toStringAsFixed(1)}%';
+    }
+    if (task.fileSize.isNotEmpty) return task.fileSize;
+    final t = task.timestamp;
+    final hh = t.hour.toString().padLeft(2, '0');
+    final mm = t.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  Widget _buildActions(BuildContext context) {
+    final (icon, onTap, tooltip, color) = switch (task.status) {
+      DownloadStatus.completed => (
+          Icons.folder_open,
+          () => _openFolder(task.savePath),
+          'Open folder',
+          TColors.textMuted,
+        ),
+      DownloadStatus.error => (
+          Icons.refresh,
+          widget.onRetry,
+          'Retry',
+          TColors.amber,
+        ),
+      _ => (
+          Icons.close,
+          widget.onRemove,
+          'Cancel',
+          TColors.red,
+        ),
+    };
+
+    final actions = <Widget>[
+      _ActionButton(
+        icon: icon,
+        color: color,
+        tooltip: tooltip,
+        onTap: onTap,
       ),
-    );
-  }
-
-  Widget _buildTaskAction() {
+    ];
     if (task.status == DownloadStatus.completed) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.folder_open, color: Colors.blue),
-            onPressed: () => _openFolder(task.savePath),
-            tooltip: "Open folder",
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            onPressed: onRemove,
-            tooltip: "Remove from history",
-          ),
-        ],
+      actions.insert(
+        0,
+        _ActionButton(
+          icon: Icons.delete_outline,
+          color: TColors.red,
+          tooltip: 'Remove from history',
+          onTap: widget.onRemove,
+        ),
       );
     }
-    if (task.status == DownloadStatus.error) {
-      return IconButton(
-        icon: const Icon(Icons.refresh, color: Colors.orange),
-        onPressed: onRetry,
-        tooltip: "Retry",
-      );
-    }
-    return IconButton(
-      icon: const Icon(Icons.close, color: Colors.red),
-      onPressed: onRemove,
-      tooltip: "Cancel",
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: actions,
     );
-  }
-
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri)) {
-      throw Exception('Could not launch $url');
-    }
   }
 
   Future<void> _openFolder(String? path) async {
     if (path == null) return;
     final uri = Uri.file(path);
-    if (!await launchUrl(uri)) {
-      // On some platforms file uri might fail, try opening the parent directory
-    }
+    await launchUrl(uri);
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.color,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16, color: color),
+      iconSize: 16,
+      visualDensity: VisualDensity.compact,
+      tooltip: tooltip,
+    );
+  }
+}
+
+/// Status glyph: spinning reel while downloading, check/dot otherwise.
+class _StatusIndicator extends StatelessWidget {
+  final DownloadTask task;
+  final Animation<double> spin;
+  final double size;
+
+  const _StatusIndicator({
+    required this.task,
+    required this.spin,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final child = switch (task.status) {
+      DownloadStatus.completed =>
+        Icon(Icons.check, size: size * 0.45, color: TColors.green),
+      DownloadStatus.error =>
+        Icon(Icons.close, size: size * 0.45, color: TColors.red),
+      DownloadStatus.queued => _Reel(radius: size / 2, color: TColors.textDim),
+      DownloadStatus.downloading => RotationTransition(
+          turns: spin,
+          child: _Reel(radius: size / 2, color: TColors.amber),
+        ),
+    };
+    final isReel = task.status == DownloadStatus.downloading ||
+        task.status == DownloadStatus.queued;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Center(
+        child: isReel
+            ? child
+            : Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: task.status == DownloadStatus.completed
+                        ? TColors.green
+                        : TColors.red,
+                    width: 2,
+                  ),
+                ),
+                child: Center(child: child),
+              ),
+      ),
+    );
+  }
+}
+
+class _Reel extends StatelessWidget {
+  final double radius;
+  final Color color;
+
+  const _Reel({required this.radius, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.square(radius * 2),
+      painter: _ReelPainter(radius: radius, color: color),
+    );
+  }
+}
+
+class _ReelPainter extends CustomPainter {
+  final double radius;
+  final Color color;
+
+  _ReelPainter({required this.radius, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final ring = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawCircle(center, radius, ring);
+
+    final dot = Paint()..color = color;
+    const dotR = 2.0;
+    canvas.drawCircle(
+      Offset(center.dx, center.dy - radius + 4),
+      dotR,
+      dot,
+    );
+    canvas.drawCircle(
+      Offset(center.dx, center.dy + radius - 4),
+      dotR,
+      dot,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReelPainter oldDelegate) {
+    return oldDelegate.radius != radius || oldDelegate.color != color;
+  }
+}
+
+/// 13-bar level meter; bars light green, warm amber above 60%.
+class VuMeter extends StatelessWidget {
+  final double progress;
+  final double width;
+
+  const VuMeter({super.key, required this.progress, this.width = 130});
+
+  static const int barCount = 13;
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = (progress * barCount).round().clamp(0, barCount);
+    return SizedBox(
+      width: width,
+      height: 20,
+      child: Row(
+        children: [
+          for (var i = 0; i < barCount; i++) ...[
+            Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                margin: const EdgeInsets.symmetric(horizontal: 1),
+                decoration: BoxDecoration(
+                  color: i < filled
+                      ? (i < (barCount * 0.6).round()
+                          ? TColors.green
+                          : TColors.amber)
+                      : TColors.line,
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

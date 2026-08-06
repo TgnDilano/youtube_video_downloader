@@ -1,14 +1,18 @@
 import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:ytdlapp/controllers/download_controller.dart';
 import 'package:ytdlapp/controllers/settings_controller.dart';
+import 'package:ytdlapp/models/download_task.dart';
+import 'package:ytdlapp/ui/app_theme.dart';
 import 'package:ytdlapp/ui/settings_page.dart';
 import 'package:ytdlapp/ui/widgets/download_card.dart';
 import 'package:ytdlapp/ui/widgets/input_area.dart';
 import 'package:ytdlapp/ui/widgets/terminal_view.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:ytdlapp/models/download_task.dart';
+import 'package:ytdlapp/ui/widgets/tubemate_controls.dart';
+import 'package:ytdlapp/ui/widgets/tubemate_sidebar.dart';
 
 class TubemateClone extends StatefulWidget {
   const TubemateClone({super.key});
@@ -30,6 +34,7 @@ class _TubemateCloneState extends State<TubemateClone> {
   bool _downloadFullPlaylist = true;
   bool _showTerminal = false;
   int _selectedIndex = 0;
+  int _activeTab = 0;
 
   // Preview state
   Map<String, dynamic>? _currentPreview;
@@ -98,49 +103,35 @@ class _TubemateCloneState extends State<TubemateClone> {
     super.dispose();
   }
 
+  bool get _isTransportActive =>
+      _controller.downloadingTasks.any((t) => t.isPlaylist == false) ||
+      _controller.tasks.any(
+        (t) =>
+            t.isPlaylist &&
+            t.status == DownloadStatus.downloading,
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
         children: [
-          // Sidebar
-          NavigationRail(
-            backgroundColor: const Color(0xFF1E1E1E),
+          TubemateSidebar(
             selectedIndex: _selectedIndex,
             onDestinationSelected: (idx) =>
                 setState(() => _selectedIndex = idx),
-            labelType: NavigationRailLabelType.all,
-            leading: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset(
-                  'assets/app_icon.png',
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
+          ),
+          Expanded(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1180),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(34, 30, 34, 24),
+                  child: _selectedIndex == 0
+                      ? _buildHome()
+                      : SettingsPage(settings: _settings),
                 ),
               ),
-            ),
-            destinations: const [
-              NavigationRailDestination(
-                icon: Icon(Icons.home),
-                label: Text('Home'),
-              ),
-              NavigationRailDestination(
-                icon: Icon(Icons.settings),
-                label: Text('Settings'),
-              ),
-            ],
-          ),
-
-          // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(40.0),
-              child: _selectedIndex == 0
-                  ? _buildHome()
-                  : SettingsPage(settings: _settings),
             ),
           ),
         ],
@@ -148,36 +139,14 @@ class _TubemateCloneState extends State<TubemateClone> {
     );
   }
 
+  // ---------------------------------------------------------------- Home
+
   Widget _buildHome() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Welcome to Tubemate",
-                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  "Enter the url of a video and let the magic happen!",
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
-            IconButton(
-              icon: const Icon(Icons.terminal),
-              onPressed: () => setState(() => _showTerminal = !_showTerminal),
-              tooltip: "Toggle Terminal",
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        // Input Section
+        _buildHeader(),
+        const SizedBox(height: 26),
         InputArea(
           urlController: _urlController,
           selectedPath: _selectedPath ?? _settings.defaultDownloadPath,
@@ -189,70 +158,150 @@ class _TubemateCloneState extends State<TubemateClone> {
         ),
 
         if (_isFetchingPreview)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-          ),
-
-        if (_currentPreview != null) _buildPreviewCard(),
-
-        const SizedBox(height: 32),
-
-        // Task List
-        Expanded(
-          flex: _showTerminal ? 2 : 1,
-          child: DefaultTabController(
-            length: 3,
-            child: Column(
+          Padding(
+            padding: const EdgeInsets.only(top: 18),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: TabBar(
-                        tabs: [
-                          Tab(text: "Downloading"),
-                          Tab(text: "History"),
-                          Tab(text: "Failed"),
-                        ],
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _controller.clearAllHistory(),
-                      icon: const Icon(Icons.delete_sweep_outlined, size: 18),
-                      label: const Text("Clear All"),
-                      style: TextButton.styleFrom(foregroundColor: Colors.grey),
-                    ),
-                  ],
-                ),
-                Expanded(
-                  child: TabBarView(
-                    children: [
-                      _buildTaskList(filter: "downloading"),
-                      _buildTaskList(filter: "completed"),
-                      _buildTaskList(filter: "failed"),
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: TColors.green,
+                    boxShadow: [
+                      BoxShadow(color: TColors.green, blurRadius: 6),
                     ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'FETCHING PREVIEW…',
+                  style: TText.mono(
+                    context,
+                    size: 11,
+                    color: TColors.textDim,
                   ),
                 ),
               ],
             ),
           ),
+
+        if (_currentPreview != null) _buildCassetteCard(),
+
+        const SizedBox(height: 30),
+        _buildTabs(context),
+        const SizedBox(height: 18),
+
+        Expanded(
+          child: IndexedStack(
+            index: _activeTab,
+            children: [
+              _buildTaskList(filter: "downloading"),
+              _buildTaskList(filter: "completed"),
+              _buildTaskList(filter: "failed"),
+            ],
+          ),
         ),
-        Visibility(
-          visible: _showTerminal,
-          child: Expanded(
-            flex: 1,
+
+        if (_showTerminal) ...[
+          const SizedBox(height: 18),
+          Expanded(
             child: TerminalView(controller: _controller),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildHeader() {
+    final active = _isTransportActive;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.only(bottom: 18),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: TColors.line)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      active
+                          ? 'Media Transport / Active'
+                          : 'Media Transport / Idle',
+                      style: TText.mono(
+                        context,
+                        size: 11,
+                        letterSpacing: 0.18,
+                        color: TColors.amber,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tubemate',
+                      style: TText.display(context, size: 30),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Drop in a URL, set your range, hit record.',
+                      style: TText.body(context, size: 13.5, color: TColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: active ? TColors.amber : TColors.green,
+                      boxShadow: [
+                        BoxShadow(
+                          color: active ? TColors.amber : TColors.green,
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    active ? 'Capturing stream' : 'Ready to capture',
+                    style: TText.mono(context, size: 11, color: TColors.textDim),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    onPressed: () =>
+                        setState(() => _showTerminal = !_showTerminal),
+                    icon: const Icon(
+                      Icons.terminal,
+                      size: 16,
+                      color: TColors.textDim,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Toggle Terminal',
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPreviewCard() {
+  // ------------------------------------------------------- Cassette card
+
+  Widget _buildCassetteCard() {
     final info = _currentPreview!;
     final bool isPlaylist = info['_type'] == 'playlist';
 
-    // Extract best thumbnail
     String? thumbnailUrl = info['thumbnail'];
     if (thumbnailUrl == null && info['thumbnails'] != null) {
       final List thumbs = info['thumbnails'];
@@ -261,8 +310,172 @@ class _TubemateCloneState extends State<TubemateClone> {
       }
     }
 
+    final entryCount = isPlaylist
+        ? (info['entries']?.length ??
+            info['n_entries'] ??
+            (info['entries'] == null ? null : 0))
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 18),
+        Container(
+          decoration: BoxDecoration(
+            color: TColors.panel2,
+            border: Border.all(color: TColors.line),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Thumbnail(url: thumbnailUrl, tag: isPlaylist ? 'Playlist' : 'Video'),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isPlaylist
+                                ? 'Playlist · ${entryCount ?? '…'} items'
+                                : '${info['uploader'] ?? 'YouTube'} · ${info['duration_string'] ?? ''}'
+                                    .toUpperCase(),
+                            style: TText.mono(
+                              context,
+                              size: 9.5,
+                              letterSpacing: 0.08,
+                              color: TColors.textDim,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            info['title'] ?? 'Unknown Title',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TText.display(
+                              context,
+                              size: 19,
+                              weight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isPlaylist
+                                ? (info['description']?.toString() ??
+                                    (info['entries'] is List &&
+                                            (info['entries'] as List).isNotEmpty
+                                        ? ((info['entries'] as List).first['title']
+                                                ?.toString() ??
+                                            '')
+                                        : ''))
+                                : '${info['uploader'] ?? ''} · ${info['duration_string'] ?? ''}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TText.body(
+                              context,
+                              size: 12.5,
+                              color: TColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _OpenLinkButton(
+                      onPressed: () {
+                        final url = info['webpage_url'] ?? info['url'];
+                        if (url != null) launchUrl(Uri.parse(url));
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                decoration: const BoxDecoration(
+                  color: TColors.counterBg,
+                  border: Border(top: BorderSide(color: TColors.lineSoft)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: isPlaylist
+                          ? _buildPlaylistRangeControls(context)
+                          : _buildResolutionChips(context),
+                    ),
+                    const SizedBox(width: 20),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Audio only',
+                          style: TText.mono(
+                            context,
+                            size: 10.5,
+                            letterSpacing: 0.08,
+                            color: TColors.textDim,
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        TubemateSwitch(
+                          value: _isAudioOnly,
+                          onChanged: (v) => setState(() {
+                            _isAudioOnly = v;
+                            if (v) {
+                              _selectedResolution = 'audio';
+                            } else if (_selectedResolution == 'audio') {
+                              _selectedResolution = _settings.defaultResolution;
+                            }
+                          }),
+                        ),
+                        const SizedBox(width: 20),
+                        RecordButton(onPressed: _startNewDownload),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlaylistRangeControls(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        MonoCheckbox(
+          value: _downloadFullPlaylist,
+          label: 'Full playlist',
+          onTap: () => setState(() => _downloadFullPlaylist = !_downloadFullPlaylist),
+        ),
+        if (!_downloadFullPlaylist) ...[
+          const SizedBox(width: 18),
+          Text(
+            'RANGE'.toUpperCase(),
+            style: TText.mono(context, size: 11, color: TColors.textMuted),
+          ),
+          const SizedBox(width: 8),
+          CounterInput(controller: _playlistStartController),
+          const SizedBox(width: 8),
+          Text('—', style: TText.mono(context, size: 13, color: TColors.textMuted)),
+          const SizedBox(width: 8),
+          CounterInput(controller: _playlistEndController),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildResolutionChips(BuildContext context) {
+    final info = _currentPreview!;
     List<int> heights = [];
-    if (!isPlaylist && info['formats'] != null) {
+    if (info['formats'] != null) {
       for (var f in info['formats']) {
         if (f['height'] != null && f['vcodec'] != 'none') {
           int h = f['height'];
@@ -271,220 +484,90 @@ class _TubemateCloneState extends State<TubemateClone> {
       }
     }
     heights.sort((a, b) => b.compareTo(a));
-    // Limit to common resolutions
     final displayHeights = heights.take(5).toList();
 
-    return Container(
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  thumbnailUrl ?? "",
-                  width: 120,
-                  height: 68,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      Container(width: 120, height: 68, color: Colors.black),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      info['title'] ?? "Unknown Title",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      isPlaylist
-                          ? "Playlist • ${info['entries']?.length ?? info['n_entries'] ?? 'multiple'} items"
-                          : "${info['uploader'] ?? ''} • ${info['duration_string'] ?? ''}",
-                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.open_in_new, size: 20),
-                onPressed: () =>
-                    launchUrl(Uri.parse(info['webpage_url'] ?? info['url'])),
-              ),
-            ],
-          ),
+    final chips = <String>['best', ...displayHeights.map((h) => h.toString())];
 
-          if (isPlaylist) ...[
-            const Divider(height: 32, color: Colors.white10),
-            Row(
-              children: [
-                const Text("Full Playlist", style: TextStyle(fontSize: 13)),
-                Checkbox(
-                  value: _downloadFullPlaylist,
-                  onChanged: (v) =>
-                      setState(() => _downloadFullPlaylist = v ?? true),
-                  activeColor: Colors.green,
-                ),
-                const SizedBox(width: 16),
-                if (!_downloadFullPlaylist) ...[
-                  const Text(
-                    "Range:",
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
-                  const SizedBox(width: 12),
-                  SizedBox(
-                    width: 60,
-                    child: TextField(
-                      controller: _playlistStartController,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        hintText: "1",
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text("to"),
-                  ),
-                  SizedBox(
-                    width: 60,
-                    child: TextField(
-                      controller: _playlistEndController,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        hintText: "10",
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                const Text("Audio Only", style: TextStyle(fontSize: 13)),
-                Switch(
-                  value: _isAudioOnly,
-                  onChanged: (v) => setState(() => _isAudioOnly = v),
-                  activeThumbColor: Colors.green,
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton.icon(
-                  onPressed: _startNewDownload,
-                  icon: const Icon(Icons.download, size: 18),
-                  label: const Text("Download"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final value in chips)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _ResolutionChip(
+                value: value,
+                label: value == 'best' ? 'Best' : '${value}p',
+                selected: _selectedResolution == value,
+                onTap: () => setState(() {
+                  _selectedResolution = value;
+                  _isAudioOnly = false;
+                }),
+              ),
             ),
-          ] else ...[
-            const Divider(height: 32, color: Colors.white10),
-            Row(
-              children: [
-                const Text(
-                  "Format:",
-                  style: TextStyle(fontSize: 13, color: Colors.grey),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black26,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildResolutionChip("audio", "Audio (MP3)"),
-                          const VerticalDivider(
-                            width: 16,
-                            color: Colors.white10,
-                            thickness: 1,
-                          ),
-                          _buildResolutionChip("best", "Best Video"),
-                          ...displayHeights.map(
-                            (h) => _buildResolutionChip(h.toString(), "${h}p"),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton.icon(
-                  onPressed: _startNewDownload,
-                  icon: const Icon(Icons.download, size: 18),
-                  label: const Text("Download"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );
   }
 
-  Widget _buildResolutionChip(String value, String label) {
-    bool isSelected = _selectedResolution == value;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedResolution = value;
-          _isAudioOnly = value == "audio";
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.green : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? Colors.white : Colors.grey,
+  // ------------------------------------------------------------- Tabs
+
+  Widget _buildTabs(BuildContext context) {
+    final counts = [
+      _controller.downloadingTasks.length,
+      _controller.completedTasks.length,
+      _controller.failedTasks.length,
+    ];
+    final labels = ['Downloading', 'History', 'Failed'];
+
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: TColors.line)),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++) ...[
+            _TabItem(
+              label: labels[i],
+              count: counts[i],
+              active: _activeTab == i,
+              onTap: () => setState(() => _activeTab = i),
+            ),
+            const SizedBox(width: 30),
+          ],
+          const Spacer(),
+          InkWell(
+            onTap: () => _controller.clearAllHistory(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.delete_sweep_outlined,
+                    size: 12,
+                    color: TColors.textDim,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Clear all',
+                    style: TText.mono(
+                      context,
+                      size: 11,
+                      color: TColors.textDim,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
+
+  // ----------------------------------------------------------- Task list
 
   Widget _buildTaskList({required String filter}) {
     return ListenableBuilder(
@@ -499,17 +582,31 @@ class _TubemateCloneState extends State<TubemateClone> {
           tasks = _controller.failedTasks;
         }
 
+        if (tasks.isEmpty) {
+          return Center(
+            child: Text(
+              'NO ITEMS IN THIS LANE',
+              style: TText.mono(context, size: 11, color: TColors.textDim),
+            ),
+          );
+        }
+
         return ListView.builder(
           itemCount: tasks.length,
-          itemBuilder: (context, index) => DownloadCard(
-            task: tasks[index],
-            onRemove: () => _controller.removeTask(tasks[index]),
-            onRetry: () => _controller.retryTask(tasks[index]),
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: DownloadCard(
+              task: tasks[index],
+              onRemove: () => _controller.removeTask(tasks[index]),
+              onRetry: () => _controller.retryTask(tasks[index]),
+            ),
           ),
         );
       },
     );
   }
+
+  // ----------------------------------------------------------- Actions
 
   void _startNewDownload() async {
     final path = _selectedPath ?? _settings.defaultDownloadPath;
@@ -559,5 +656,194 @@ class _TubemateCloneState extends State<TubemateClone> {
       _isAudioOnly = false;
       _selectedResolution = _settings.defaultResolution;
     });
+  }
+}
+
+// -------------------------------------------------------------- Sub widgets
+
+class _TabItem extends StatelessWidget {
+  final String label;
+  final int count;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _TabItem({
+    required this.label,
+    required this.count,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: active ? TColors.amber : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label.toUpperCase(),
+              style: TText.mono(
+                context,
+                size: 11.5,
+                letterSpacing: 0.08,
+                color: active ? TColors.amber : TColors.textDim,
+              ),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              '· ${count.toString().padLeft(2, '0')}',
+              style: TText.mono(
+                context,
+                size: 10,
+                color: active ? TColors.amber : TColors.textDim,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Thumbnail extends StatelessWidget {
+  final String? url;
+  final String tag;
+
+  const _Thumbnail({required this.url, required this.tag});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 108,
+      height: 72,
+      decoration: BoxDecoration(
+        border: Border.all(color: TColors.line),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [TColors.thumbGradA, TColors.thumbGradB, TColors.thumbGradC],
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (url != null && url!.isNotEmpty)
+            Image.network(
+              url!,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
+            ),
+          const Scanlines(
+            horizontal: false,
+            color: Color(0x26000000),
+            thickness: 2,
+          ),
+          Positioned(
+            top: 5,
+            left: 6,
+            child: Container(
+              color: const Color(0x59FFFFFF),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              child: Text(
+                tag.toUpperCase(),
+                style: TText.mono(
+                  context,
+                  size: 7,
+                  letterSpacing: 0.06,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OpenLinkButton extends StatefulWidget {
+  final VoidCallback onPressed;
+
+  const _OpenLinkButton({required this.onPressed});
+
+  @override
+  State<_OpenLinkButton> createState() => _OpenLinkButtonState();
+}
+
+class _OpenLinkButtonState extends State<_OpenLinkButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: InkWell(
+        onTap: widget.onPressed,
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: _hovered ? TColors.amber : TColors.line,
+            ),
+          ),
+          child: Icon(
+            Icons.open_in_new,
+            size: 13,
+            color: _hovered ? TColors.amber : TColors.textDim,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResolutionChip extends StatelessWidget {
+  final String value;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ResolutionChip({
+    required this.value,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: TColors.jackBg,
+          border: Border.all(
+            color: selected ? TColors.amber : TColors.line,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TText.mono(
+            context,
+            size: 10.5,
+            color: selected ? TColors.amber : TColors.textMuted,
+          ),
+        ),
+      ),
+    );
   }
 }

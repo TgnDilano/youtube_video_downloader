@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tubemate — Redesign</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #14120F;
+    --panel: #1E1B17;
+    --panel-2: #24211C;
+    --line: #322D26;
+    --line-soft: #26221D;
+    --text: #F2EDE4;
+    --text-muted: #8A8477;
+    --text-dim: #5C574C;
+    --amber: #FF8A3D;
+    --amber-dim: #7A4A26;
+    --green: #7FD858;
+    --green-dim: #3E5A2E;
+    --red: #E1573F;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; background: var(--bg); }
+  body{
+    font-family: var(--font-body);
+    color: var(--text);
+    padding: 28px;
+    min-height: 100vh;
+  }
+
+  .app{
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 84px 1fr;
+    gap: 0;
+    border: 1px solid var(--line);
+    background: var(--panel);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    border-right: 1px solid var(--line);
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    background:
+      repeating-linear-gradient(180deg, transparent 0 3px, rgba(255,255,255,0.012) 3px 4px),
+      var(--panel);
+  }
+  .logo{
+    width: 40px; height: 40px;
+    border: 1.5px solid var(--amber);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .logo::before{
+    content:"";
+    position:absolute; inset: -5px;
+    border: 1px dashed var(--amber-dim);
+    border-radius: 50%;
+  }
+  .logo svg{ width: 16px; height: 16px; }
+
+  .nav-item{
+    width: 100%;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 10px 0;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .nav-item svg{ width: 18px; height: 18px; stroke: var(--text-dim); }
+  .nav-item span{ font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+  .nav-item.active{ border-left-color: var(--amber); background: rgba(255,138,61,0.06); }
+  .nav-item.active svg{ stroke: var(--amber); }
+  .nav-item.active span{ color: var(--amber); }
+
+  .sidebar-foot{
+    margin-top: auto;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    writing-mode: vertical-rl;
+    letter-spacing: 0.15em;
+    padding-bottom: 6px;
+  }
+
+  /* ---------- Main ---------- */
+  .main{ padding: 30px 34px 24px; }
+
+  .header{
+    display:flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 26px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .header .eyebrow{
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;
+    color: var(--amber); text-transform: uppercase; margin-bottom: 8px;
+  }
+  h1{
+    font-family: var(--font-display); font-weight: 700; font-size: 30px;
+    margin: 0 0 6px; letter-spacing: -0.01em;
+  }
+  .header p{ margin:0; color: var(--text-muted); font-size: 13.5px; }
+  .transport-status{
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+    display:flex; align-items:center; gap: 8px;
+  }
+  .dot{ width:6px; height:6px; border-radius:50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  /* ---------- Input jack panel ---------- */
+  .panel{
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+  }
+  .field{
+    display:flex; align-items:center; gap: 12px;
+    padding: 15px 18px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .field:last-child{ border-bottom: none; }
+  .jack{
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #100E0B;
+    border: 1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink: 0;
+  }
+  .jack svg{ width: 13px; height: 13px; stroke: var(--amber); }
+  .field-label{
+    font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-dim); margin-bottom: 3px;
+  }
+  .field-value{
+    font-family: var(--font-mono); font-size: 13.5px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .field-value.path{ color: var(--amber); }
+
+  /* ---------- Cassette card ---------- */
+  .cassette{
+    margin-top: 18px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .cassette-top{
+    display:flex; gap: 16px; padding: 18px;
+  }
+  .thumb{
+    width: 108px; height: 72px;
+    flex-shrink:0;
+    position: relative;
+    background: linear-gradient(135deg, #3A2A5C 0%, #C23B7A 55%, #FF8A3D 100%);
+    border: 1px solid var(--line);
+    overflow: hidden;
+  }
+  .thumb::after{
+    content:"";
+    position:absolute; inset:0;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0 2px, transparent 2px 4px);
+  }
+  .thumb-tag{
+    position:absolute; top:5px; left:6px;
+    font-family: var(--font-mono); font-size: 7px; letter-spacing:0.06em;
+    color: rgba(255,255,255,0.85); background: rgba(0,0,0,0.35);
+    padding: 1px 4px;
+  }
+  .meta-block{ flex:1; min-width:0; }
+  .meta-block .kicker{
+    font-family: var(--font-mono); font-size: 9.5px; color: var(--text-dim);
+    letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 5px;
+  }
+  .meta-block h2{
+    font-family: var(--font-display); font-size: 19px; margin: 0 0 4px; font-weight: 600;
+  }
+  .meta-block .sub{ font-size: 12.5px; color: var(--text-muted); }
+  .open-link{
+    align-self: flex-start;
+    width: 30px; height: 30px;
+    border: 1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    color: var(--text-dim); flex-shrink:0; cursor:pointer;
+  }
+  .open-link:hover{ border-color: var(--amber); color: var(--amber); }
+  .open-link svg{ width:13px; height:13px; }
+
+  .counter-row{
+    display:flex; align-items:center; justify-content: space-between;
+    padding: 14px 18px;
+    border-top: 1px solid var(--line-soft);
+    background: #1A1712;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .range-controls{ display:flex; align-items:center; gap: 18px; }
+
+  .toggle-pill{
+    display:flex; align-items:center; gap:9px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.06em; cursor:pointer;
+  }
+  .checkbox{
+    width:15px; height:15px; border: 1.5px solid var(--text-dim);
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  .tape-counter{
+    display:flex; align-items:center; gap: 8px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .counter-input{
+    width: 46px; text-align:center;
+    background: #100E0B; border: 1px solid var(--line);
+    color: var(--amber); font-family: var(--font-mono); font-size: 13px;
+    padding: 5px 0;
+  }
+  .counter-input:focus{ outline: 1.5px solid var(--amber); outline-offset: 1px; }
+
+  .right-controls{ display:flex; align-items:center; gap: 20px; margin-left:auto; }
+
+  .switch{
+    width: 38px; height: 20px; border: 1px solid var(--line);
+    background: #100E0B; position:relative; cursor:pointer;
+  }
+  .switch::after{
+    content:""; position:absolute; top:2px; left:2px;
+    width:14px; height:14px; background: var(--text-dim);
+  }
+  .switch.on{ border-color: var(--amber); }
+  .switch.on::after{ left: 20px; background: var(--amber); }
+  .switch-label{ font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; }
+
+  .btn-download{
+    display:flex; align-items:center; gap:9px;
+    background: var(--amber); color: #14120F;
+    border: none; padding: 11px 22px;
+    font-family: var(--font-display); font-weight: 700; font-size: 13.5px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .btn-download:hover{ background: #FFA35E; }
+  .btn-download svg{ width: 15px; height: 15px; }
+  .btn-download:focus-visible{ outline: 2px solid #fff; outline-offset:2px; }
+
+  /* ---------- Tabs ---------- */
+  .tabs{
+    display:flex; align-items:center; gap: 30px;
+    margin-top: 30px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .tab{
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-dim); cursor:pointer;
+    padding-bottom: 12px; margin-bottom: -13px; border-bottom: 2px solid transparent;
+    display:flex; align-items:center; gap:7px;
+  }
+  .tab .count{ color: var(--text-dim); font-size:10px; }
+  .tab.active{ color: var(--amber); border-bottom-color: var(--amber); }
+  .tab.active .count{ color: var(--amber); }
+  .clear-all{
+    margin-left:auto; display:flex; align-items:center; gap:6px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-dim);
+    text-transform:uppercase; letter-spacing:0.06em; cursor:pointer;
+  }
+  .clear-all svg{ width:12px; height:12px; }
+
+  /* ---------- Queue items with reel + VU meter ---------- */
+  .queue{ margin-top: 18px; display:flex; flex-direction:column; gap:10px; }
+  .qitem{
+    display:flex; align-items:center; gap: 16px;
+    border: 1px solid var(--line); background: var(--panel-2);
+    padding: 14px 18px;
+  }
+  .reel{
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 2px solid var(--amber);
+    position: relative; flex-shrink:0;
+    animation: spin 3s linear infinite;
+  }
+  .reel::before, .reel::after{
+    content:""; position:absolute; width:4px; height:4px; background: var(--amber); border-radius:50%;
+  }
+  .reel::before{ top: 4px; left: 50%; transform: translateX(-50%); }
+  .reel::after{ bottom: 4px; left: 50%; transform: translateX(-50%); }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+
+  .qinfo{ flex: 1; min-width:0; }
+  .qinfo .qtitle{ font-size: 13.5px; margin-bottom: 3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .qinfo .qmeta{ font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); }
+
+  .vu{
+    display:flex; align-items:flex-end; gap:2px; height: 20px; width: 130px; flex-shrink:0;
+  }
+  .vu span{
+    flex:1; background: var(--line); border-radius: 1px;
+  }
+  .vu span.filled{ background: var(--green); }
+  .vu span.filled.warm{ background: var(--amber); }
+
+  .timecode{
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);
+    width: 64px; text-align:right; flex-shrink:0;
+  }
+
+  .empty-tabs{
+    margin-top: 60px; text-align:center; color: var(--text-dim);
+    font-family: var(--font-mono); font-size: 11px; letter-spacing:0.05em;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="sidebar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#FF8A3D" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+      <span>Settings</span>
+    </div>
+    <div class="sidebar-foot">TUBEMATE v2 · MEDIA TRANSPORT</div>
+  </div>
+
+  <div class="main">
+
+    <div class="header">
+      <div>
+        <div class="eyebrow">Media Transport / Idle</div>
+        <h1>Tubemate</h1>
+        <p>Drop in a URL, set your range, hit record.</p>
+      </div>
+      <div class="transport-status"><span class="dot"></span> Ready to capture</div>
+    </div>
+
+    <div class="panel">
+      <div class="field">
+        <div class="jack"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1"/><path d="M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg></div>
+        <div style="flex:1; min-width:0;">
+          <div class="field-label">Input · Video or Playlist URL</div>
+          <div class="field-value">https://www.youtube.com/watch?v=Zs10xGBHslQ&list=PLEviz2ThpVt0&index=2</div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="jack"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg></div>
+        <div style="flex:1; min-width:0;">
+          <div class="field-label">Output · Save Location</div>
+          <div class="field-value path">/Users/dilanetagni/Downloads</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cassette">
+      <div class="cassette-top">
+        <div class="thumb"><span class="thumb-tag">flutterCon</span></div>
+        <div class="meta-block">
+          <div class="kicker">Playlist · 24 items</div>
+          <h2>flutterCon USA 2026</h2>
+          <div class="sub">Become a Full Stack Dev — Writing Us is Just the Start</div>
+        </div>
+        <div class="open-link"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg></div>
+      </div>
+      <div class="counter-row">
+        <div class="range-controls">
+          <label class="toggle-pill">
+            <span class="checkbox"></span> Full playlist
+          </label>
+          <div class="tape-counter">
+            Range <input class="counter-input" value="01" /> — <input class="counter-input" value="10" />
+          </div>
+        </div>
+        <div class="right-controls">
+          <div style="display:flex; align-items:center; gap:9px;">
+            <span class="switch-label">Audio only</span>
+            <div class="switch"></div>
+          </div>
+          <button class="btn-download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#14120F" stroke-width="2.4"><circle cx="12" cy="12" r="9"/></svg>
+            Record
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active">Downloading <span class="count">· 02</span></div>
+      <div class="tab">History <span class="count">· 118</span></div>
+      <div class="tab">Failed <span class="count">· 00</span></div>
+      <div class="clear-all"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6"/></svg> Clear all</div>
+    </div>
+
+    <div class="queue">
+      <div class="qitem">
+        <div class="reel"></div>
+        <div class="qinfo">
+          <div class="qtitle">flutterCon USA 2026 — Ep. 02: Writing Us is Just the Start</div>
+          <div class="qmeta">1080p · MP4 · 64%</div>
+        </div>
+        <div class="vu">
+          <span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span><span class="filled"></span>
+          <span class="filled warm"></span><span class="filled warm"></span><span class="filled warm"></span>
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="timecode">02:14 / 03:28</div>
+      </div>
+      <div class="qitem">
+        <div class="reel" style="animation-duration: 4.5s;"></div>
+        <div class="qinfo">
+          <div class="qtitle">flutterCon USA 2026 — Ep. 03: State Management Deep Dive</div>
+          <div class="qmeta">Audio only · MP3 · 22%</div>
+        </div>
+        <div class="vu">
+          <span class="filled"></span><span class="filled"></span><span class="filled warm"></span>
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="timecode">00:41 / 03:05</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

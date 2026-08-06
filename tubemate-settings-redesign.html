@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tubemate — Settings Redesign</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #14120F;
+    --panel: #1E1B17;
+    --panel-2: #24211C;
+    --line: #322D26;
+    --line-soft: #26221D;
+    --text: #F2EDE4;
+    --text-muted: #8A8477;
+    --text-dim: #5C574C;
+    --amber: #FF8A3D;
+    --amber-dim: #7A4A26;
+    --green: #7FD858;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; background: var(--bg); }
+  body{
+    font-family: var(--font-body);
+    color: var(--text);
+    padding: 28px;
+    min-height: 100vh;
+  }
+
+  .app{
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 84px 1fr;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    min-height: 760px;
+  }
+
+  /* ---------- Sidebar (shared) ---------- */
+  .sidebar{
+    border-right: 1px solid var(--line);
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    background:
+      repeating-linear-gradient(180deg, transparent 0 3px, rgba(255,255,255,0.012) 3px 4px),
+      var(--panel);
+  }
+  .logo{
+    width: 40px; height: 40px;
+    border: 1.5px solid var(--amber);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .logo::before{
+    content:"";
+    position:absolute; inset: -5px;
+    border: 1px dashed var(--amber-dim);
+    border-radius: 50%;
+  }
+  .nav-item{
+    width: 100%;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 10px 0;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .nav-item svg{ width: 18px; height: 18px; stroke: var(--text-dim); }
+  .nav-item span{ font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+  .nav-item.active{ border-left-color: var(--amber); background: rgba(255,138,61,0.06); }
+  .nav-item.active svg{ stroke: var(--amber); }
+  .nav-item.active span{ color: var(--amber); }
+  .sidebar-foot{
+    margin-top: auto;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    writing-mode: vertical-rl;
+    letter-spacing: 0.15em;
+    padding-bottom: 6px;
+  }
+
+  /* ---------- Main ---------- */
+  .main{ padding: 30px 34px 24px; }
+
+  .header{
+    margin-bottom: 30px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .header .eyebrow{
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em;
+    color: var(--amber); text-transform: uppercase; margin-bottom: 8px;
+  }
+  h1{
+    font-family: var(--font-display); font-weight: 700; font-size: 30px;
+    margin: 0 0 6px; letter-spacing: -0.01em;
+  }
+  .header p{ margin:0; color: var(--text-muted); font-size: 13.5px; }
+
+  /* ---------- Channel group ---------- */
+  .group{ margin-bottom: 36px; }
+  .group-label{
+    display:flex; align-items:center; gap: 10px;
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.18em;
+    color: var(--text-dim); text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .group-label .tick{
+    width: 14px; height: 1px; background: var(--amber-dim);
+  }
+  .group-label .idx{ color: var(--amber); }
+
+  .panel{
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+  }
+
+  .row{
+    display:flex; align-items:center; gap: 16px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--line-soft);
+    cursor: default;
+  }
+  .row:last-child{ border-bottom: none; }
+  .row.clickable{ cursor: pointer; }
+  .row.clickable:hover{ background: rgba(255,138,61,0.035); }
+
+  .jack{
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #100E0B;
+    border: 1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink: 0;
+  }
+  .jack svg{ width: 14px; height: 14px; stroke: var(--amber); }
+  .jack.mono{
+    border-radius: 3px;
+    font-family: var(--font-mono); font-size: 8.5px; letter-spacing: 0.02em;
+    color: var(--amber); font-weight: 600;
+  }
+
+  .row-text{ flex:1; min-width:0; }
+  .row-title{ font-size: 14.5px; font-weight: 500; margin-bottom: 3px; }
+  .row-sub{ font-size: 12px; color: var(--text-muted); }
+  .row-sub.path{ font-family: var(--font-mono); color: var(--text-dim); }
+
+  .chevron{ width: 15px; height: 15px; stroke: var(--text-dim); flex-shrink:0; }
+
+  /* ---------- Rotary dial selector (resolution) ---------- */
+  .dial-select{
+    display:flex; align-items:center; gap: 10px;
+    background: #100E0B; border: 1px solid var(--line);
+    padding: 7px 14px 7px 8px;
+    cursor: pointer;
+  }
+  .dial{
+    width: 22px; height: 22px; border-radius:50%;
+    border: 2px solid var(--amber);
+    position: relative; flex-shrink:0;
+  }
+  .dial::after{
+    content:""; position:absolute; top: 2px; left: 50%;
+    width: 2px; height: 6px; background: var(--amber);
+    transform: translateX(-50%) rotate(35deg);
+    transform-origin: bottom center;
+  }
+  .dial-select .val{
+    font-family: var(--font-mono); font-size: 13px; color: var(--text); font-weight:600;
+  }
+  .dial-select .caret{ width: 11px; height:11px; stroke: var(--text-dim); }
+
+  /* ---------- Switch (shared style) ---------- */
+  .switch{
+    width: 40px; height: 21px; border: 1px solid var(--line);
+    background: #100E0B; position:relative; cursor:pointer; flex-shrink:0;
+  }
+  .switch::after{
+    content:""; position:absolute; top:2px; left:2px;
+    width:15px; height:15px; background: var(--text-dim);
+  }
+  .switch.on{ border-color: var(--green); background: rgba(127,216,88,0.08); }
+  .switch.on::after{ left: 21px; background: var(--green); box-shadow: 0 0 6px rgba(127,216,88,0.6); }
+
+  .row-note{
+    font-family: var(--font-mono); font-size: 9.5px; color: var(--text-dim);
+    letter-spacing: 0.04em; margin-top: 6px;
+  }
+
+  /* ---------- Version strip footer ---------- */
+  .version-strip{
+    margin-top: 8px;
+    display:flex; align-items:center; justify-content: space-between;
+    padding: 14px 4px;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-dim);
+    letter-spacing: 0.06em;
+  }
+  .version-strip .rev{ color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="sidebar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#FF8A3D" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+    </div>
+    <div class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+      <span>Settings</span>
+    </div>
+    <div class="sidebar-foot">TUBEMATE v2 · MEDIA TRANSPORT</div>
+  </div>
+
+  <div class="main">
+
+    <div class="header">
+      <div class="eyebrow">Media Transport / Configuration</div>
+      <h1>Settings</h1>
+      <p>Set the defaults every capture starts from.</p>
+    </div>
+
+    <div class="group">
+      <div class="group-label"><span class="idx">01</span><span class="tick"></span> General</div>
+      <div class="panel">
+        <div class="row clickable">
+          <div class="jack"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg></div>
+          <div class="row-text">
+            <div class="row-title">Default download folder</div>
+            <div class="row-sub path">/Users/dilanetagni/Downloads</div>
+          </div>
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="group-label"><span class="idx">02</span><span class="tick"></span> Downloads</div>
+      <div class="panel">
+        <div class="row">
+          <div class="jack mono">HQ</div>
+          <div class="row-text">
+            <div class="row-title">Default resolution</div>
+            <div class="row-sub">Applied to every new capture unless overridden</div>
+          </div>
+          <div class="dial-select">
+            <div class="dial"></div>
+            <span class="val">1080p</span>
+            <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+        </div>
+        <div class="row">
+          <div class="jack"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg></div>
+          <div class="row-text">
+            <div class="row-title">Auto-fetch preview</div>
+            <div class="row-sub">Fetch video info the moment a link lands in the input</div>
+          </div>
+          <div class="switch on"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="version-strip">
+      <span>BUILD 2.0.4 · DARWIN ARM64</span>
+      <span class="rev">● ALL SYSTEMS NOMINAL</span>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

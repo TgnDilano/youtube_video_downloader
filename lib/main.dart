@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ytdlapp/ui/app_theme.dart';
 import 'package:ytdlapp/ui/home_page.dart';
 
 void main() {
@@ -12,10 +13,8 @@ class TubemateApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        primaryColor: Colors.green,
-        scaffoldBackgroundColor: const Color(0xFF121212),
-      ),
+      title: 'Tubemate',
+      theme: buildTubemateTheme(context),
       home: const TubemateClone(),
     );
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:ytdlapp/ui/app_theme.dart';
 
+/// The jack panel: input URL + output save-location rows.
 class InputArea extends StatelessWidget {
   final TextEditingController urlController;
   final String? selectedPath;
@@ -17,32 +19,97 @@ class InputArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white10),
+        color: TColors.panel2,
+        border: Border.all(color: TColors.line),
       ),
       child: Column(
         children: [
-          TextField(
-            controller: urlController,
-            onSubmitted: (_) => onStartDownload(),
-            decoration: const InputDecoration(
-              hintText: "Insert or Paste URL Here",
-              border: InputBorder.none,
-              prefixIcon: Icon(Icons.link),
+          _field(
+            context,
+            icon: Icons.link,
+            label: 'Input · Video or Playlist URL',
+            child: TextField(
+              controller: urlController,
+              onSubmitted: (_) => onStartDownload(),
+              style: TText.mono(context, size: 13.5, color: TColors.text),
+              cursorColor: TColors.amber,
+              decoration: const InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                hintStyle: TextStyle(color: TColors.textDim),
+              ),
             ),
           ),
-          const Divider(color: Colors.white10),
-          Row(
-            children: [
-              TextButton.icon(
-                onPressed: onSelectFolder,
-                icon: const Icon(Icons.folder_open),
-                label: Text(selectedPath ?? "Select Folder"),
+          Divider(
+            height: 1,
+            color: TColors.lineSoft,
+            indent: 0,
+            endIndent: 0,
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onSelectFolder,
+            child: _field(
+              context,
+              icon: Icons.folder_outlined,
+              label: 'Output · Save Location',
+              child: Text(
+                selectedPath ?? 'Not set — tap to choose',
+                overflow: TextOverflow.ellipsis,
+                style: TText.mono(
+                  context,
+                  size: 13.5,
+                  color: TColors.amber,
+                ),
               ),
-            ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Widget child,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: TColors.jackBg,
+              border: Border.all(color: TColors.line),
+            ),
+            child: Icon(icon, size: 13, color: TColors.amber),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label.toUpperCase(),
+                  style: TText.mono(
+                    context,
+                    size: 9.5,
+                    letterSpacing: 0.1,
+                    color: TColors.textDim,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                child,
+              ],
+            ),
           ),
         ],
       ),
