@@ -70,6 +70,7 @@ class DownloadController extends ChangeNotifier {
     bool isPlaylist = false,
     int? playlistStart,
     int? playlistEnd,
+    String? playlistItems,
     String resolution = "best",
     Map<String, dynamic>? metadata,
   }) async {
@@ -82,6 +83,7 @@ class DownloadController extends ChangeNotifier {
         audioOnly,
         playlistStart: playlistStart,
         playlistEnd: playlistEnd,
+        playlistItems: playlistItems,
         playlistTitle: metadata?['title'],
         resolution: resolution,
       );
@@ -117,6 +119,7 @@ class DownloadController extends ChangeNotifier {
     bool audioOnly, {
     int? playlistStart,
     int? playlistEnd,
+    String? playlistItems,
     String? playlistTitle,
     String resolution = 'best',
   }) async {
@@ -151,6 +154,9 @@ class DownloadController extends ChangeNotifier {
       }
       if (playlistEnd != null) {
         args.addAll(['--playlist-end', playlistEnd.toString()]);
+      }
+      if (playlistItems != null && playlistItems.isNotEmpty) {
+        args.addAll(['--playlist-items', playlistItems]);
       }
 
       args.add(url);

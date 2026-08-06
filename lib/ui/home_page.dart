@@ -25,9 +25,6 @@ class _TubemateCloneState extends State<TubemateClone> {
   final DownloadController _controller = DownloadController();
   final SettingsController _settings = SettingsController();
   final TextEditingController _urlController = TextEditingController();
-  final TextEditingController _playlistStartController =
-      TextEditingController();
-  final TextEditingController _playlistEndController = TextEditingController();
 
   String? _selectedPath;
   bool _isAudioOnly = false;
@@ -40,14 +37,12 @@ class _TubemateCloneState extends State<TubemateClone> {
   Map<String, dynamic>? _currentPreview;
   bool _isFetchingPreview = false;
   String _selectedResolution = "best";
+  Set<int> _selectedPlaylistItems = {};
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _playlistStartController.text = '1';
-    _playlistEndController.text = '10';
-
     _urlController.addListener(_onUrlChanged);
 
     _settings.addListener(() {
@@ -90,6 +85,11 @@ class _TubemateCloneState extends State<TubemateClone> {
       if (info != null) {
         // Reset resolution to default when new video is fetched
         _selectedResolution = _settings.defaultResolution;
+        // Default selection: every playlist item
+        final entries = info['entries'];
+        _selectedPlaylistItems = entries is List
+            ? {for (var i = 1; i <= entries.length; i++) i}
+            : {};
       }
     });
   }
@@ -98,8 +98,6 @@ class _TubemateCloneState extends State<TubemateClone> {
   void dispose() {
     _debounce?.cancel();
     _urlController.dispose();
-    _playlistStartController.dispose();
-    _playlistEndController.dispose();
     super.dispose();
   }
 
@@ -404,7 +402,7 @@ class _TubemateCloneState extends State<TubemateClone> {
                   children: [
                     Expanded(
                       child: isPlaylist
-                          ? _buildPlaylistRangeControls(context)
+                          ? _buildPlaylistControls(context)
                           : _buildResolutionChips(context),
                     ),
                     const SizedBox(width: 20),
@@ -439,6 +437,7 @@ class _TubemateCloneState extends State<TubemateClone> {
                   ],
                 ),
               ),
+              if (isPlaylist) _buildPlaylistSelector(context),
             ],
           ),
         ),
@@ -446,30 +445,138 @@ class _TubemateCloneState extends State<TubemateClone> {
     );
   }
 
-  Widget _buildPlaylistRangeControls(BuildContext context) {
+  Widget _buildPlaylistControls(BuildContext context) {
+    final total = _playlistEntryCount;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         MonoCheckbox(
           value: _downloadFullPlaylist,
           label: 'Full playlist',
-          onTap: () => setState(() => _downloadFullPlaylist = !_downloadFullPlaylist),
+          onTap: () => setState(
+            () => _downloadFullPlaylist = !_downloadFullPlaylist,
+          ),
         ),
-        if (!_downloadFullPlaylist) ...[
+        if (!_downloadFullPlaylist && total > 0) ...[
           const SizedBox(width: 18),
           Text(
-            'RANGE'.toUpperCase(),
+            '${_selectedPlaylistItems.length} / $total selected',
             style: TText.mono(context, size: 11, color: TColors.textMuted),
           ),
-          const SizedBox(width: 8),
-          CounterInput(controller: _playlistStartController),
-          const SizedBox(width: 8),
-          Text('—', style: TText.mono(context, size: 13, color: TColors.textMuted)),
-          const SizedBox(width: 8),
-          CounterInput(controller: _playlistEndController),
         ],
       ],
     );
+  }
+
+  int get _playlistEntryCount {
+    final entries = _currentPreview?['entries'];
+    return entries is List ? entries.length : 0;
+  }
+
+  /// Selector panel listing every playlist item with a checkbox.
+  Widget _buildPlaylistSelector(BuildContext context) {
+    final entries = _currentPreview?['entries'];
+    if (entries is! List || entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final total = entries.length;
+    final selectedCount = _selectedPlaylistItems.length;
+    final allSelected = selectedCount == total;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: TColors.counterBg,
+        border: Border(top: BorderSide(color: TColors.lineSoft)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 10, 4),
+            child: Row(
+              children: [
+                Text(
+                  'TRACKS'.toUpperCase(),
+                  style: TText.mono(
+                    context,
+                    size: 9.5,
+                    letterSpacing: 0.1,
+                    color: TColors.textDim,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _downloadFullPlaylist
+                        ? 'Downloading all'
+                        : '$selectedCount of $total selected',
+                    style: TText.mono(
+                      context,
+                      size: 10,
+                      color: _downloadFullPlaylist
+                          ? TColors.greenDim
+                          : TColors.textMuted,
+                    ),
+                  ),
+                ),
+                _SelectorAction(
+                  label: allSelected ? 'Clear' : 'Select all',
+                  enabled: !_downloadFullPlaylist,
+                  onTap: () => setState(() {
+                    if (allSelected) {
+                      _selectedPlaylistItems = {};
+                    } else {
+                      _selectedPlaylistItems = {
+                        for (var i = 1; i <= total; i++) i
+                      };
+                    }
+                  }),
+                ),
+              ],
+            ),
+          ),
+          if (!_downloadFullPlaylist)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 184),
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.only(bottom: 6),
+                itemCount: entries.length,
+                itemBuilder: (context, index) {
+                  final entry = entries[index] as Map? ?? {};
+                  final itemIndex = index + 1;
+                  final selected =
+                      _selectedPlaylistItems.contains(itemIndex);
+                  return _PlaylistItemRow(
+                    index: itemIndex,
+                    title: entry['title']?.toString() ?? 'Untitled item',
+                    duration: _formatDuration(entry['duration']),
+                    selected: selected,
+                    onTap: () => setState(() {
+                      if (selected) {
+                        _selectedPlaylistItems.remove(itemIndex);
+                      } else {
+                        _selectedPlaylistItems.add(itemIndex);
+                      }
+                    }),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDuration(Object? value) {
+    if (value is! num) return '';
+    final total = value.toInt();
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+    String two(int v) => v.toString().padLeft(2, '0');
+    return h > 0 ? '$h:${two(m)}:${two(s)}' : '$m:${two(s)}';
   }
 
   Widget _buildResolutionChips(BuildContext context) {
@@ -621,20 +728,26 @@ class _TubemateCloneState extends State<TubemateClone> {
     if (url.isEmpty) return;
 
     if (_currentPreview != null && _currentPreview!['_type'] == 'playlist') {
-      final int? start = _downloadFullPlaylist
-          ? null
-          : int.tryParse(_playlistStartController.text);
-      final int? end = _downloadFullPlaylist
-          ? null
-          : int.tryParse(_playlistEndController.text);
+      String? playlistItems;
+      if (!_downloadFullPlaylist) {
+        if (_selectedPlaylistItems.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Select at least one item to download"),
+            ),
+          );
+          return;
+        }
+        final sorted = _selectedPlaylistItems.toList()..sort();
+        playlistItems = sorted.join(',');
+      }
 
       _controller.addDownload(
         url,
         path,
         _isAudioOnly,
         isPlaylist: true,
-        playlistStart: start,
-        playlistEnd: end,
+        playlistItems: playlistItems,
         metadata:
             _currentPreview, // Pass metadata to include title for subfolder
       );
@@ -842,6 +955,99 @@ class _ResolutionChip extends StatelessWidget {
             size: 10.5,
             color: selected ? TColors.amber : TColors.textMuted,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectorAction extends StatelessWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _SelectorAction({
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Text(
+          label.toUpperCase(),
+          style: TText.mono(
+            context,
+            size: 10,
+            letterSpacing: 0.06,
+            color: enabled ? TColors.textMuted : TColors.textDim,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaylistItemRow extends StatelessWidget {
+  final int index;
+  final String title;
+  final String duration;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PlaylistItemRow({
+    required this.index,
+    required this.title,
+    required this.duration,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        color: selected
+            ? TColors.amber.withValues(alpha: 0.04)
+            : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+        child: Row(
+          children: [
+            CheckSquare(value: selected),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 20,
+              child: Text(
+                index.toString().padLeft(2, '0'),
+                style: TText.mono(context, size: 10, color: TColors.textDim),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TText.body(
+                  context,
+                  size: 13,
+                  color: selected ? TColors.text : TColors.textMuted,
+                ),
+              ),
+            ),
+            if (duration.isNotEmpty) ...[
+              const SizedBox(width: 12),
+              Text(
+                duration,
+                style: TText.mono(context, size: 11, color: TColors.textMuted),
+              ),
+            ],
+          ],
         ),
       ),
     );

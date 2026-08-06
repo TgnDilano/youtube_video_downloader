@@ -56,6 +56,31 @@ class TubemateSwitch extends StatelessWidget {
   }
 }
 
+/// Square checkbox tile used across the app.
+class CheckSquare extends StatelessWidget {
+  final bool value;
+  final double size;
+
+  const CheckSquare({super.key, required this.value, this.size = 15});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: value ? TColors.amber : TColors.textDim,
+          width: 1.5,
+        ),
+      ),
+      child: value
+          ? Icon(Icons.check, size: size * 0.7, color: TColors.amber)
+          : null,
+    );
+  }
+}
+
 /// Square checkbox with mono label, used by the "Full playlist" pill.
 class MonoCheckbox extends StatelessWidget {
   final bool value;
@@ -77,19 +102,7 @@ class MonoCheckbox extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 15,
-            height: 15,
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: value ? TColors.amber : TColors.textDim,
-                width: 1.5,
-              ),
-            ),
-            child: value
-                ? const Icon(Icons.check, size: 10, color: TColors.amber)
-                : null,
-          ),
+          CheckSquare(value: value),
           const SizedBox(width: 9),
           Text(
             label.toUpperCase(),
