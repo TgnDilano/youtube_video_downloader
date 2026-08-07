@@ -20,11 +20,10 @@ Future<void> _initWindow() async {
 
   await windowManager.ensureInitialized();
 
-  const size = Size(1024, 640); // smaller default
+  const size = Size(1024, 640);
   final options = const WindowOptions(
     size: size,
-    minimumSize: Size(800, 500), // allow shrinking down to this
-    // no maximumSize -> allows growing
+    minimumSize: Size(800, 500),
     center: true,
     titleBarStyle: TitleBarStyle.hidden,
     windowButtonVisibility: false,
