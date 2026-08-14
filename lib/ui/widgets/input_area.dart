@@ -4,15 +4,19 @@ import 'package:ytdlapp/ui/app_theme.dart';
 /// The jack panel: input URL + output save-location rows.
 class InputArea extends StatelessWidget {
   final TextEditingController urlController;
+  final FocusNode urlFocusNode;
   final String? selectedPath;
   final VoidCallback onSelectFolder;
+  final VoidCallback onUrlSubmitted;
   final VoidCallback onStartDownload;
 
   const InputArea({
     super.key,
     required this.urlController,
+    required this.urlFocusNode,
     required this.selectedPath,
     required this.onSelectFolder,
+    required this.onUrlSubmitted,
     required this.onStartDownload,
   });
 
@@ -31,7 +35,8 @@ class InputArea extends StatelessWidget {
             label: 'Input · Video or Playlist URL',
             child: TextField(
               controller: urlController,
-              onSubmitted: (_) => onStartDownload(),
+              focusNode: urlFocusNode,
+              onSubmitted: (_) => onUrlSubmitted(),
               style: TText.mono(context, size: 13.5, color: TColors.text),
               cursorColor: TColors.amber,
               decoration: const InputDecoration(

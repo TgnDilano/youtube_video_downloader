@@ -10,6 +10,7 @@ import 'package:ytdlapp/ui/app_theme.dart';
 import 'package:ytdlapp/ui/settings_page.dart';
 import 'package:ytdlapp/ui/widgets/download_card.dart';
 import 'package:ytdlapp/ui/widgets/input_area.dart';
+import 'package:ytdlapp/ui/widgets/playlist_options_dialog.dart';
 import 'package:ytdlapp/ui/widgets/resolution_dialog.dart';
 import 'package:ytdlapp/ui/widgets/terminal_view.dart';
 import 'package:ytdlapp/ui/widgets/tubemate_controls.dart';
@@ -26,6 +27,7 @@ class _TubemateCloneState extends State<TubemateClone> {
   final DownloadController _controller = DownloadController();
   final SettingsController _settings = SettingsController();
   final TextEditingController _urlController = TextEditingController();
+  final FocusNode _urlFocusNode = FocusNode();
 
   String? _selectedPath;
   bool _isAudioOnly = false;
@@ -46,6 +48,9 @@ class _TubemateCloneState extends State<TubemateClone> {
   void initState() {
     super.initState();
     _urlController.addListener(_onUrlChanged);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _urlFocusNode.requestFocus(),
+    );
 
     _settings.addListener(() {
       if (mounted) {
@@ -101,6 +106,7 @@ class _TubemateCloneState extends State<TubemateClone> {
   void dispose() {
     _debounce?.cancel();
     _urlController.dispose();
+    _urlFocusNode.dispose();
     super.dispose();
   }
 
@@ -150,11 +156,13 @@ class _TubemateCloneState extends State<TubemateClone> {
         const SizedBox(height: 26),
         InputArea(
           urlController: _urlController,
+          urlFocusNode: _urlFocusNode,
           selectedPath: _selectedPath ?? _settings.defaultDownloadPath,
           onSelectFolder: () async {
             String? path = await FilePicker.platform.getDirectoryPath();
             if (path != null) setState(() => _selectedPath = path);
           },
+          onUrlSubmitted: _onUrlSubmitted,
           onStartDownload: _startNewDownload,
         ),
 
@@ -788,6 +796,105 @@ class _TubemateCloneState extends State<TubemateClone> {
 
   // ----------------------------------------------------------- Actions
 
+  /// Enter in the URL field: fetch the preview if needed, let the user pick
+  /// options (resolution / playlist items) and only then queue the download.
+  Future<void> _onUrlSubmitted() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) return;
+
+    _debounce?.cancel();
+
+    if (_currentPreview == null || _currentPreview!['webpage_url'] != url) {
+      await _fetchPreview(url);
+      if (!mounted) return;
+    }
+    final info = _currentPreview;
+    if (info == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't fetch video info — check the link"),
+        ),
+      );
+      return;
+    }
+
+    if (info['_type'] == 'playlist') {
+      final proceed = await _showPlaylistOptions(url, info);
+      if (!proceed || !mounted) return;
+    } else {
+      final proceed = await _showSingleVideoOptions(url, info);
+      if (!proceed || !mounted) return;
+    }
+    _startNewDownload();
+  }
+
+  /// Returns true when the user picked an option (download should queue).
+  Future<bool> _showSingleVideoOptions(
+    String url,
+    Map<String, dynamic> info,
+  ) async {
+    final videoUrl = (info['webpage_url'] ?? info['url'])?.toString() ?? url;
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (_) => ResolutionDialog(
+        controller: _controller,
+        url: videoUrl,
+        title: info['title']?.toString() ?? 'Unknown Title',
+        duration: _formatDuration(info['duration']),
+        thumbnailUrl: _previewThumb(info),
+        current: _selectedResolution == 'audio'
+            ? 'audio'
+            : _settings.defaultResolution,
+        showAudio: true,
+      ),
+    );
+    if (chosen == null || !mounted) return false;
+    setState(() {
+      if (chosen == 'audio') {
+        _isAudioOnly = true;
+        _selectedResolution = 'audio';
+      } else {
+        _isAudioOnly = false;
+        _selectedResolution = chosen;
+      }
+    });
+    return true;
+  }
+
+  /// Returns true when the user confirmed the playlist options.
+  Future<bool> _showPlaylistOptions(
+    String url,
+    Map<String, dynamic> info,
+  ) async {
+    final entries = info['entries'];
+    if (entries is! List || entries.isEmpty) {
+      return true;
+    }
+    final opts = await showDialog<PlaylistOptions>(
+      context: context,
+      builder: (_) => PlaylistOptionsDialog(
+        controller: _controller,
+        url: url,
+        title: info['title']?.toString() ?? 'Playlist',
+        thumbnailUrl: _previewThumb(info),
+        entries: entries,
+        initialFullPlaylist: _downloadFullPlaylist,
+        initialSelection: _selectedPlaylistItems,
+        initialResolution: _settings.defaultResolution,
+        initialAudioOnly: _isAudioOnly,
+      ),
+    );
+    if (opts == null || !mounted) return false;
+    setState(() {
+      _downloadFullPlaylist = opts.fullPlaylist;
+      _selectedPlaylistItems = opts.selectedItems;
+      _isAudioOnly = opts.audioOnly;
+      _selectedResolution =
+          opts.audioOnly ? 'audio' : opts.resolution;
+    });
+    return true;
+  }
+
   void _startNewDownload() async {
     final path = _selectedPath ?? _settings.defaultDownloadPath;
     if (path == null) {
@@ -821,7 +928,9 @@ class _TubemateCloneState extends State<TubemateClone> {
         _isAudioOnly,
         isPlaylist: true,
         playlistItems: playlistItems,
-        resolution: _settings.defaultResolution,
+        resolution: _selectedResolution == "audio"
+            ? "best"
+            : _selectedResolution,
         itemResolutions: _itemResolutions.isEmpty
             ? null
             : {
