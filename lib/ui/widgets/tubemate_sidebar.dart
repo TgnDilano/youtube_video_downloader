@@ -103,6 +103,12 @@ class TubemateSidebar extends StatelessWidget {
             children: [
               const SizedBox(height: 14),
               const Center(child: TrafficLights()),
+              const SizedBox(height: 14),
+              Container(
+                width: 44,
+                height: 1,
+                color: TColors.line,
+              ),
               const SizedBox(height: 18),
               const _Logo(),
               const SizedBox(height: 24),

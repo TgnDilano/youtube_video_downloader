@@ -163,7 +163,7 @@ class TrafficLights extends StatelessWidget {
           tooltip: 'Close',
           onTap: () => _confirmAndClose(context),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 7),
         _Dot(
           color: _yellow,
           icon: Icons.remove,
@@ -174,7 +174,7 @@ class TrafficLights extends StatelessWidget {
             } catch (_) {}
           },
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 7),
         _Dot(
           color: _green,
           icon: Icons.zoom_out_map,
@@ -220,8 +220,8 @@ class _DotState extends State<_Dot> {
           behavior: HitTestBehavior.opaque,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 120),
-            width: 12,
-            height: 12,
+            width: 10,
+            height: 10,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: _hovered
@@ -234,7 +234,7 @@ class _DotState extends State<_Dot> {
             child: _hovered
                 ? Icon(
                     widget.icon,
-                    size: 8,
+                    size: 7,
                     color: const Color(0x66000000),
                   )
                 : null,
