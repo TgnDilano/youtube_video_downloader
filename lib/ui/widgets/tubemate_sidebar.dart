@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
+import 'package:ytdlapp/ui/widgets/traffic_lights.dart';
 
 /// Subtle repeating scanline texture used by the sidebar and thumbnails.
 class Scanlines extends StatelessWidget {
@@ -100,7 +101,9 @@ class TubemateSidebar extends StatelessWidget {
             ),
           ),          Column(
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
+              const Center(child: TrafficLights()),
+              const SizedBox(height: 18),
               const _Logo(),
               const SizedBox(height: 24),
               _NavItem(

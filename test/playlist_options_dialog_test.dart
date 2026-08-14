@@ -17,6 +17,33 @@ void main() {
     expect(field.focusNode?.hasFocus, isTrue);
   });
 
+  testWidgets('Close button asks for confirmation before exiting',
+      (tester) async {
+    tester.view.physicalSize = const Size(1440, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(const TubemateApp());
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Close TubeXMate?'), findsOneWidget);
+
+    await tester.tap(find.text('CANCEL'));
+    await tester.pumpAndSettle();
+    expect(find.text('Close TubeXMate?'), findsNothing);
+
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('EXIT'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Close TubeXMate?'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Playlist options dialog renders and returns selection',
       (tester) async {
     final controller = DownloadController();
