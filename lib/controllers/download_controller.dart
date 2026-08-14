@@ -226,11 +226,109 @@ class DownloadController extends ChangeNotifier {
   }
 
   Future<String> _getBinaryPath(String cmd) async {
+    final exeName = Platform.isWindows ? '$cmd.exe' : cmd;
+    final bundle = _bundleDirectory();
+    if (bundle != null) {
+      final bundled = File('${bundle.path}/$exeName');
+      if (await bundled.exists()) return bundled.path;
+    }
     List<String> paths = ['/opt/homebrew/bin/$cmd', '/usr/local/bin/$cmd'];
     for (var path in paths) {
       if (await File(path).exists()) return path;
     }
     return cmd;
+  }
+
+  /// Directory containing the running executable: the app bundle's
+  /// Contents/MacOS on macOS, the app folder on Windows.
+  static Directory? _bundleDirectory() {
+    final exe = Platform.resolvedExecutable;
+    if (exe.isEmpty) return null;
+    return File(exe).parent;
+  }
+
+  /// Runs `<tool> --version` and returns the first output line, or null if
+  /// the tool is unavailable.
+  Future<String?> getToolVersion(String tool) async {
+    final bin = await _getBinaryPath(tool);
+    try {
+      final result = await Process.run(bin, ['--version']);
+      if (result.exitCode == 0) {
+        final out = (result.stdout as String).trim();
+        if (out.isEmpty) return null;
+        return out.split('\n').first;
+      }
+    } catch (e) {
+      log.add("Error reading $tool version: $e");
+    }
+    return null;
+  }
+
+  /// Fetches the latest yt-dlp release tag (e.g. "v2026.08.01") from GitHub,
+  /// or null on failure.
+  Future<String?> fetchLatestYtDlpVersion() async {
+    final curl = Platform.isWindows ? 'curl.exe' : 'curl';
+    try {
+      final result = await Process.run(curl, [
+        '-sL',
+        '--max-time',
+        '20',
+        'https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest',
+      ]);
+      if (result.exitCode != 0) return null;
+      final data = jsonDecode(result.stdout as String);
+      if (data is Map) return data['tag_name']?.toString();
+    } catch (e) {
+      log.add("Error fetching latest yt-dlp version: $e");
+    }
+    return null;
+  }
+
+  /// Downloads the latest yt-dlp release and replaces the bundled binary.
+  /// Returns the installed version on success, null on failure.
+  Future<String?> updateYtDlp() async {
+    final bundle = _bundleDirectory();
+    if (bundle == null) return null;
+    final exeName = Platform.isWindows ? 'yt-dlp.exe' : 'yt-dlp';
+    final target = File('${bundle.path}/$exeName');
+    if (!await target.exists()) return null;
+
+    final asset = Platform.isWindows ? 'yt-dlp.exe' : 'yt-dlp_macos';
+    final url =
+        'https://github.com/yt-dlp/yt-dlp/releases/latest/download/$asset';
+    final tmp = File('${target.path}.new');
+    final curl = Platform.isWindows ? 'curl.exe' : 'curl';
+
+    try {
+      final dl = await Process.run(curl, ['-sL', '-f', '-o', tmp.path, url]);
+      if (dl.exitCode != 0) return null;
+      if (!await tmp.exists() || await tmp.length() < 1000000) return null;
+      if (Platform.isMacOS || Platform.isLinux) {
+        await Process.run('chmod', ['+x', tmp.path]);
+      }
+
+      final verify = await Process.run(tmp.path, ['--version']);
+      if (verify.exitCode != 0) return null;
+      final version = (verify.stdout as String).trim().split('\n').first;
+
+      try {
+        await tmp.rename(target.path);
+      } catch (_) {
+        await target.delete();
+        await tmp.rename(target.path);
+      }
+      log.add('--- yt-dlp updated to $version ---');
+      return version;
+    } catch (e) {
+      log.add("Error updating yt-dlp: $e");
+      return null;
+    } finally {
+      if (await tmp.exists()) {
+        try {
+          await tmp.delete();
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> _fetchMetadata(DownloadTask task) async {

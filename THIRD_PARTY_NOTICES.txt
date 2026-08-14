@@ -1,0 +1,26 @@
+THIRD PARTY NOTICES
+====================
+
+TubeXMate bundles third-party command-line tools that are executed as
+separate processes. They are downloaded at build time into the app bundle.
+
+yt-dlp
+------
+Source: https://github.com/yt-dlp/yt-dlp
+License: Unlicense / Public Domain
+"A command-line program to download videos from YouTube and other sites."
+
+ffmpeg
+------
+Source: https://ffmpeg.org
+The bundled ffmpeg executable is compiled from the FFmpeg source code.
+- macOS build (evermeet.cx): licensed under LGPL v2.1 or later.
+- Windows build (gyan.dev): licensed under GPL v3 (includes components under
+  the GPL). 
+This application invokes ffmpeg as a standalone process and does not link
+against it. License texts:
+- LGPL v2.1: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+- GPL v3: https://www.gnu.org/licenses/gpl-3.0.html
+- FFmpeg source code: https://ffmpeg.org/download.html#releases
+
+These tools may be updated in-app via the Settings > Engine "Update" action.

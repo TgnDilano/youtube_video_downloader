@@ -130,7 +130,7 @@ class _TubemateCloneState extends State<TubemateClone> {
                   padding: const EdgeInsets.fromLTRB(34, 30, 34, 24),
                   child: _selectedIndex == 0
                       ? _buildHome()
-                      : SettingsPage(settings: _settings),
+                      : SettingsPage(settings: _settings, controller: _controller),
                 ),
               ),
             ),

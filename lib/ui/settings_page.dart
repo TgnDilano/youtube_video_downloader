@@ -3,14 +3,20 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:ytdlapp/controllers/download_controller.dart';
 import 'package:ytdlapp/controllers/settings_controller.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
 import 'package:ytdlapp/ui/widgets/tubemate_controls.dart';
 
 class SettingsPage extends StatelessWidget {
   final SettingsController settings;
+  final DownloadController controller;
 
-  const SettingsPage({super.key, required this.settings});
+  const SettingsPage({
+    super.key,
+    required this.settings,
+    required this.controller,
+  });
 
   static const List<({String value, String label})> _resolutionOptions = [
     (value: 'best', label: 'Best'),
@@ -34,9 +40,10 @@ class SettingsPage extends StatelessWidget {
     return ListenableBuilder(
       listenable: settings,
       builder: (context, _) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        return SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(bottom: 18),
@@ -144,9 +151,20 @@ class SettingsPage extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 36),
+            _GroupLabel(index: '03', label: 'Engine'),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: TColors.panel2,
+                border: Border.all(color: TColors.line),
+              ),
+              child: _EngineGroup(controller: controller),
+            ),
             const SizedBox(height: 8),
             const _VersionStrip(),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -299,6 +317,176 @@ class _Chevron extends StatelessWidget {
       Icons.chevron_right,
       size: 15,
       color: TColors.textDim,
+    );
+  }
+}
+
+class _EngineGroup extends StatefulWidget {
+  final DownloadController controller;
+
+  const _EngineGroup({required this.controller});
+
+  @override
+  State<_EngineGroup> createState() => _EngineGroupState();
+}
+
+class _EngineGroupState extends State<_EngineGroup> {
+  String? _ytDlpVersion;
+  String? _ffmpegVersion;
+  String? _latestVersion;
+  String? _error;
+  bool _checking = false;
+  bool _updating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInstalled();
+  }
+
+  Future<void> _loadInstalled() async {
+    final ytDlp = await widget.controller.getToolVersion('yt-dlp');
+    final ffmpeg = await widget.controller.getToolVersion('ffmpeg');
+    if (!mounted) return;
+    setState(() {
+      _ytDlpVersion = ytDlp;
+      _ffmpegVersion = ffmpeg;
+    });
+  }
+
+  static String _normalize(String? v) =>
+      (v ?? '').replaceFirst(RegExp(r'^v'), '').trim();
+
+  bool get _updateAvailable =>
+      _latestVersion != null &&
+      _normalize(_latestVersion) != _normalize(_ytDlpVersion);
+
+  bool get _busy => _checking || _updating;
+
+  Future<void> _checkForUpdate() async {
+    setState(() {
+      _checking = true;
+      _error = null;
+    });
+    final latest = await widget.controller.fetchLatestYtDlpVersion();
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      if (latest == null) {
+        _error = 'Could not reach the update server';
+      } else {
+        _latestVersion = latest;
+      }
+    });
+  }
+
+  Future<void> _runUpdate() async {
+    setState(() {
+      _updating = true;
+      _error = null;
+    });
+    final updated = await widget.controller.updateYtDlp();
+    if (!mounted) return;
+    setState(() {
+      _updating = false;
+      if (updated != null) {
+        _ytDlpVersion = updated;
+      } else {
+        _error = 'Update failed — check your connection and try again';
+      }
+    });
+  }
+
+  String get _subtitle {
+    if (_error != null) return _error!;
+    if (_checking) return 'Checking for yt-dlp updates…';
+    if (_latestVersion != null) {
+      return _updateAvailable
+          ? 'Update available: ${_latestVersion!}'
+          : 'Engine is up to date';
+    }
+    final parts = <String>[
+      _ytDlpVersion != null ? 'yt-dlp $_ytDlpVersion' : 'yt-dlp not detected',
+      if (_ffmpegVersion != null) 'ffmpeg $_ffmpegVersion',
+    ];
+    return parts.join(' · ');
+  }
+
+  String get _actionLabel {
+    if (_updating) return 'UPDATING…';
+    if (_checking) return 'CHECKING…';
+    if (_latestVersion == null) return 'CHECK';
+    return _updateAvailable ? 'UPDATE' : 'UP TO DATE';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingRow(
+      leading: const _Jack(
+        child: Icon(
+          Icons.settings_ethernet,
+          size: 14,
+          color: TColors.amber,
+        ),
+      ),
+      title: 'Download engine',
+      subtitle: _subtitle,
+      trailing: _EngineActionButton(
+        label: _actionLabel,
+        enabled: !_busy && (_latestVersion == null || _updateAvailable),
+        onPressed: _latestVersion == null ? _checkForUpdate : _runUpdate,
+      ),
+    );
+  }
+}
+
+class _EngineActionButton extends StatefulWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _EngineActionButton({
+    required this.label,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  State<_EngineActionButton> createState() => _EngineActionButtonState();
+}
+
+class _EngineActionButtonState extends State<_EngineActionButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: widget.enabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
+      onEnter: widget.enabled ? (_) => setState(() => _hovered = true) : null,
+      onExit: widget.enabled ? (_) => setState(() => _hovered = false) : null,
+      child: InkWell(
+        onTap: widget.enabled ? widget.onPressed : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: TColors.jackBg,
+            border: Border.all(
+              color: _hovered && widget.enabled ? TColors.amber : TColors.line,
+            ),
+          ),
+          child: Text(
+            widget.label,
+            style: TText.mono(
+              context,
+              size: 10.5,
+              letterSpacing: 0.06,
+              color: widget.enabled ? TColors.amber : TColors.textDim,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
