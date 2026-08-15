@@ -10,10 +10,11 @@ Source: https://github.com/yt-dlp/yt-dlp
 License: Unlicense / Public Domain
 "A command-line program to download videos from YouTube and other sites."
 
-ffmpeg
-------
+ffmpeg / ffprobe
+-----------------
 Source: https://ffmpeg.org
-The bundled ffmpeg executable is compiled from the FFmpeg source code.
+The bundled ffmpeg and ffprobe executables are compiled from the FFmpeg
+source code.
 - macOS build (evermeet.cx): licensed under LGPL v2.1 or later.
 - Windows build (gyan.dev): licensed under GPL v3 (includes components under
   the GPL). 

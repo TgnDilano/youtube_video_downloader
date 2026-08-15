@@ -120,7 +120,7 @@ class MonoCheckbox extends StatelessWidget {
 
 /// The amber CTA of the cassette card.
 class RecordButton extends StatefulWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final String label;
 
   const RecordButton({super.key, required this.onPressed, this.label = 'Download'});
@@ -142,11 +142,21 @@ class _RecordButtonState extends State<RecordButton> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
-          color: _hovered ? TColors.amberBright : TColors.amber,
+          color: _hovered && widget.onPressed != null
+              ? TColors.amberBright
+              : widget.onPressed != null
+                  ? TColors.amber
+                  : TColors.jackBg,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.play_circle_outline, size: 15, color: Color(0xFF14120F)),
+              Icon(
+                Icons.play_circle_outline,
+                size: 15,
+                color: widget.onPressed != null
+                    ? const Color(0xFF14120F)
+                    : TColors.textDim,
+              ),
               const SizedBox(width: 9),
               Text(
                 widget.label.toUpperCase(),
@@ -154,7 +164,9 @@ class _RecordButtonState extends State<RecordButton> {
                   context,
                   size: 13.5,
                   weight: FontWeight.w700,
-                  color: const Color(0xFF14120F),
+                  color: widget.onPressed != null
+                      ? const Color(0xFF14120F)
+                      : TColors.textDim,
                 ).copyWith(letterSpacing: 0.04),
               ),
             ],

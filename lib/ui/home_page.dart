@@ -4,9 +4,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ytdlapp/controllers/download_controller.dart';
+import 'package:ytdlapp/controllers/convert_controller.dart';
 import 'package:ytdlapp/controllers/settings_controller.dart';
 import 'package:ytdlapp/models/download_task.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
+import 'package:ytdlapp/ui/convert_page.dart';
 import 'package:ytdlapp/ui/settings_page.dart';
 import 'package:ytdlapp/ui/widgets/download_card.dart';
 import 'package:ytdlapp/ui/widgets/input_area.dart';
@@ -25,6 +27,7 @@ class TubemateClone extends StatefulWidget {
 
 class _TubemateCloneState extends State<TubemateClone> {
   final DownloadController _controller = DownloadController();
+  final ConvertController _convertController = ConvertController();
   final SettingsController _settings = SettingsController();
   final TextEditingController _urlController = TextEditingController();
   final FocusNode _urlFocusNode = FocusNode();
@@ -136,7 +139,9 @@ class _TubemateCloneState extends State<TubemateClone> {
                   padding: const EdgeInsets.fromLTRB(34, 30, 34, 24),
                   child: _selectedIndex == 0
                       ? _buildHome()
-                      : SettingsPage(settings: _settings, controller: _controller),
+                      : _selectedIndex == 1
+                          ? ConvertPage(controller: _convertController)
+                          : SettingsPage(settings: _settings, controller: _controller),
                 ),
               ),
             ),

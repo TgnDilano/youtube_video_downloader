@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ytdlapp/models/download_task.dart';
+import 'package:ytdlapp/services/binary_resolver.dart';
 
 class DownloadController extends ChangeNotifier {
   List<DownloadTask> tasks = [];
@@ -225,27 +226,7 @@ class DownloadController extends ChangeNotifier {
     }
   }
 
-  Future<String> _getBinaryPath(String cmd) async {
-    final exeName = Platform.isWindows ? '$cmd.exe' : cmd;
-    final bundle = _bundleDirectory();
-    if (bundle != null) {
-      final bundled = File('${bundle.path}/$exeName');
-      if (await bundled.exists()) return bundled.path;
-    }
-    List<String> paths = ['/opt/homebrew/bin/$cmd', '/usr/local/bin/$cmd'];
-    for (var path in paths) {
-      if (await File(path).exists()) return path;
-    }
-    return cmd;
-  }
-
-  /// Directory containing the running executable: the app bundle's
-  /// Contents/MacOS on macOS, the app folder on Windows.
-  static Directory? _bundleDirectory() {
-    final exe = Platform.resolvedExecutable;
-    if (exe.isEmpty) return null;
-    return File(exe).parent;
-  }
+  Future<String> _getBinaryPath(String cmd) => BinaryResolver.resolve(cmd);
 
   /// Runs `<tool> --version` and returns the first output line, or null if
   /// the tool is unavailable.
@@ -287,7 +268,7 @@ class DownloadController extends ChangeNotifier {
   /// Downloads the latest yt-dlp release and replaces the bundled binary.
   /// Returns the installed version on success, null on failure.
   Future<String?> updateYtDlp() async {
-    final bundle = _bundleDirectory();
+    final bundle = BinaryResolver.bundleDirectory();
     if (bundle == null) return null;
     final exeName = Platform.isWindows ? 'yt-dlp.exe' : 'yt-dlp';
     final target = File('${bundle.path}/$exeName');

@@ -12,7 +12,18 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 function Download($url, $dest) {
     Write-Host "  -> $dest"
-    Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+    $attempt = 0
+    while ($true) {
+        try {
+            Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+            break
+        } catch {
+            $attempt++
+            if ($attempt -ge 5) { throw }
+            Write-Host "    download failed, retrying ($attempt/5)..."
+            Start-Sleep -Seconds 5
+        }
+    }
 }
 
 Write-Host "Fetching yt-dlp.exe..."
@@ -27,6 +38,9 @@ Expand-Archive -Path $zip -DestinationPath $extract -Force
 $ffmpeg = Get-ChildItem -Path $extract -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
 if (-not $ffmpeg) { throw "ffmpeg.exe not found inside the archive" }
 Copy-Item $ffmpeg.FullName (Join-Path $out "ffmpeg.exe")
+$ffprobe = Get-ChildItem -Path $extract -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
+if (-not $ffprobe) { throw "ffprobe.exe not found inside the archive" }
+Copy-Item $ffprobe.FullName (Join-Path $out "ffprobe.exe")
 Remove-Item -Recurse -Force $extract
 Remove-Item -Force $zip
 

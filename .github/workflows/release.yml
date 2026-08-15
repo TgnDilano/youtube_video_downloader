@@ -35,9 +35,9 @@ jobs:
       - name: Inject binaries into app bundle
         run: |
           APP="build/macos/Build/Products/Release/TubeXMate.app"
-          cp build/bin/yt-dlp build/bin/ffmpeg "$APP/Contents/MacOS/"
+          cp build/bin/yt-dlp build/bin/ffmpeg build/bin/ffprobe "$APP/Contents/MacOS/"
           cp THIRD_PARTY_NOTICES.txt "$APP/Contents/Resources/"
-          chmod +x "$APP/Contents/MacOS/yt-dlp" "$APP/Contents/MacOS/ffmpeg"
+          chmod +x "$APP/Contents/MacOS/yt-dlp" "$APP/Contents/MacOS/ffmpeg" "$APP/Contents/MacOS/ffprobe"
           codesign --force --deep --sign - "$APP"
 
       - name: Package DMG
@@ -81,7 +81,7 @@ jobs:
         shell: pwsh
         run: |
           $release = "build/windows/x64/runner/Release"
-          Copy-Item build/bin/yt-dlp.exe, build/bin/ffmpeg.exe, THIRD_PARTY_NOTICES.txt $release
+          Copy-Item build/bin/yt-dlp.exe, build/bin/ffmpeg.exe, build/bin/ffprobe.exe, THIRD_PARTY_NOTICES.txt $release
 
       - name: Package ZIP
         shell: pwsh

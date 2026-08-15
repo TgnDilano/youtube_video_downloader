@@ -26,7 +26,18 @@ fi
 
 download() {
   echo "  -> $2"
-  curl -fSL --retry 3 -o "$2" "$1"
+  curl -fSL --retry 5 --retry-delay 5 --retry-all-errors -o "$2" "$1"
+}
+
+unzip_single() {
+  # Extract a single member from a (possibly mirrored) zip archive, verifying
+  # the archive is complete first to catch truncated downloads.
+  local archive="$1" member="$2" dest="$3"
+  if ! unzip -t "$archive" 1>/dev/null 2>&1; then
+    echo "ERROR: $archive is corrupt (truncated download?)" >&2
+    exit 1
+  fi
+  unzip -jo "$archive" -d "$dest" "$member" 1>/dev/null
 }
 
 case "$OS" in
@@ -40,9 +51,16 @@ case "$OS" in
     echo "Fetching ffmpeg (macOS static build)..."
     TMP="$OUT/ffmpeg.zip"
     download "https://evermeet.cx/ffmpeg/getrelease/zip" "$TMP"
-    unzip -jo "$TMP" -d "$OUT" "ffmpeg" 1>/dev/null
+    unzip_single "$TMP" "ffmpeg" "$OUT"
     rm -f "$TMP"
     chmod +x "$OUT/ffmpeg"
+
+    echo "Fetching ffprobe (macOS static build)..."
+    TMP="$OUT/ffprobe.zip"
+    download "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" "$TMP"
+    unzip_single "$TMP" "ffprobe" "$OUT"
+    rm -f "$TMP"
+    chmod +x "$OUT/ffprobe"
     ;;
   windows)
     echo "Fetching yt-dlp.exe..."
@@ -63,6 +81,12 @@ case "$OS" in
       exit 1
     fi
     cp "$FFMPEG_BIN" "$OUT/ffmpeg.exe"
+    FFPROBE_BIN="$(find "$UNZIP_DIR" -type f -name ffprobe.exe | head -n 1)"
+    if [[ -z "$FFPROBE_BIN" ]]; then
+      echo "ERROR: ffprobe.exe not found inside the archive" >&2
+      exit 1
+    fi
+    cp "$FFPROBE_BIN" "$OUT/ffprobe.exe"
     rm -rf "$UNZIP_DIR" "$TMP"
     ;;
   linux)
