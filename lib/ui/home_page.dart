@@ -792,6 +792,8 @@ class _TubemateCloneState extends State<TubemateClone> {
               task: tasks[index],
               onRemove: () => _controller.removeTask(tasks[index]),
               onRetry: () => _controller.retryTask(tasks[index]),
+              onPause: () => _controller.pauseTask(tasks[index]),
+              onResume: () => _controller.resumeTask(tasks[index]),
             ),
           ),
         );

@@ -9,6 +9,8 @@ class DownloadCard extends StatefulWidget {
   final DownloadTask task;
   final VoidCallback onRemove;
   final VoidCallback? onRetry;
+  final VoidCallback? onPause;
+  final VoidCallback? onResume;
   final bool isChild;
 
   const DownloadCard({
@@ -16,6 +18,8 @@ class DownloadCard extends StatefulWidget {
     required this.task,
     required this.onRemove,
     this.onRetry,
+    this.onPause,
+    this.onResume,
     this.isChild = false,
   });
 
@@ -95,6 +99,8 @@ class _DownloadCardState extends State<DownloadCard>
                           task: childTask,
                           onRemove: widget.onRemove,
                           onRetry: widget.onRetry,
+                          onPause: widget.onPause,
+                          onResume: widget.onResume,
                           isChild: true,
                         ),
                       ),
@@ -181,6 +187,8 @@ class _DownloadCardState extends State<DownloadCard>
     final pct = switch (task.status) {
       DownloadStatus.completed => 'Done',
       DownloadStatus.error => 'Failed',
+      DownloadStatus.paused =>
+        'Paused · ${(task.progress * 100).clamp(0, 100).round()}%',
       DownloadStatus.downloading =>
         '${(task.progress * 100).clamp(0, 100).round()}%',
       DownloadStatus.queued => 'Queued',
@@ -189,7 +197,8 @@ class _DownloadCardState extends State<DownloadCard>
   }
 
   String _timecode() {
-    if (task.status == DownloadStatus.downloading) {
+    if (task.status == DownloadStatus.downloading ||
+        task.status == DownloadStatus.paused) {
       if (task.downloadedSize.isNotEmpty && task.fileSize.isNotEmpty) {
         return '${task.downloadedSize} / ${task.fileSize}';
       }
@@ -217,6 +226,12 @@ class _DownloadCardState extends State<DownloadCard>
           'Retry',
           TColors.amber,
         ),
+      DownloadStatus.paused => (
+          Icons.play_arrow,
+          widget.onResume,
+          'Resume',
+          TColors.green,
+        ),
       _ => (
           Icons.close,
           widget.onRemove,
@@ -226,6 +241,14 @@ class _DownloadCardState extends State<DownloadCard>
     };
 
     final actions = <Widget>[
+      if (task.status == DownloadStatus.downloading &&
+          widget.onPause != null)
+        _ActionButton(
+          icon: Icons.pause,
+          color: TColors.amber,
+          tooltip: 'Pause',
+          onTap: widget.onPause,
+        ),
       _ActionButton(
         icon: icon,
         color: color,
@@ -301,6 +324,8 @@ class _StatusIndicator extends StatelessWidget {
         Icon(Icons.check, size: size * 0.45, color: TColors.green),
       DownloadStatus.error =>
         Icon(Icons.close, size: size * 0.45, color: TColors.red),
+      DownloadStatus.paused =>
+        Icon(Icons.pause, size: size * 0.45, color: TColors.textMuted),
       DownloadStatus.queued => _Reel(radius: size / 2, color: TColors.textDim),
       DownloadStatus.downloading => RotationTransition(
           turns: spin,
@@ -321,9 +346,11 @@ class _StatusIndicator extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: task.status == DownloadStatus.completed
-                        ? TColors.green
-                        : TColors.red,
+                    color: switch (task.status) {
+                      DownloadStatus.completed => TColors.green,
+                      DownloadStatus.paused => TColors.textMuted,
+                      _ => TColors.red,
+                    },
                     width: 2,
                   ),
                 ),

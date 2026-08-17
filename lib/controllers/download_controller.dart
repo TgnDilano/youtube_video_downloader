@@ -19,7 +19,8 @@ class DownloadController extends ChangeNotifier {
       .where(
         (t) =>
             t.status == DownloadStatus.downloading ||
-            t.status == DownloadStatus.queued,
+            t.status == DownloadStatus.queued ||
+            t.status == DownloadStatus.paused,
       )
       .toList();
 
@@ -367,6 +368,15 @@ class DownloadController extends ChangeNotifier {
           child.status = DownloadStatus.completed;
           child.metadata = "Completed";
           child.progress = 1.0;
+        } else if (child.pauseRequested) {
+          child.pauseRequested = false;
+          child.status = DownloadStatus.paused;
+          child.metadata = "Paused";
+          task.playlistProgress =
+              "Paused at video ${i + 1} of ${task.children.length}";
+          task.status = DownloadStatus.paused;
+          task.update();
+          break;
         } else {
           child.status = DownloadStatus.error;
           child.metadata = "Error";
@@ -374,9 +384,11 @@ class DownloadController extends ChangeNotifier {
         task.progress = completed / task.children.length;
         task.update();
       }
-      task.status = DownloadStatus.completed;
-      task.playlistProgress = "All videos downloaded";
-      task.update();
+      if (task.status != DownloadStatus.paused) {
+        task.status = DownloadStatus.completed;
+        task.playlistProgress = "All videos downloaded";
+        task.update();
+      }
       saveHistory();
       notifyListeners();
     } else {
@@ -409,6 +421,10 @@ class DownloadController extends ChangeNotifier {
     args.addAll([
       '--no-playlist',
       '--newline',
+      '--retries',
+      '10',
+      '--retry-sleep',
+      '5',
       '-o',
       '$savePath/%(title)s.%(ext)s',
       task.url,
@@ -520,6 +536,13 @@ class DownloadController extends ChangeNotifier {
       log.add('--- Download Finished (Exit Code: $exitCode) ---');
       notifyListeners();
 
+      if (task.pauseRequested) {
+        task.status = DownloadStatus.paused;
+        final pct = (task.progress * 100).clamp(0, 100).round();
+        task.metadata = task.progress > 0 ? 'Paused • $pct%' : 'Paused';
+        return false;
+      }
+
       if (exitCode == 0) {
         task.status = DownloadStatus.completed;
         task.progress = 1.0;
@@ -538,6 +561,63 @@ class DownloadController extends ChangeNotifier {
       return false;
     } finally {
       task.update();
+    }
+  }
+
+  /// Pauses a download. The running yt-dlp process is killed gracefully
+  /// (SIGINT on POSIX, terminate on Windows) so the partial `.part` file is
+  /// kept for a later resume.
+  void pauseTask(DownloadTask task) {
+    if (task.isPlaylist) {
+      final child = task.children
+          .where((c) => c.status == DownloadStatus.downloading)
+          .firstOrNull;
+      if (child != null) {
+        child.pauseRequested = true;
+        _killProcess(child.process);
+      }
+      task.status = DownloadStatus.paused;
+      task.metadata = "Paused";
+    } else {
+      task.pauseRequested = true;
+      _killProcess(task.process);
+      task.status = DownloadStatus.paused;
+      final pct = (task.progress * 100).clamp(0, 100).round();
+      task.metadata = task.progress > 0
+          ? 'Paused • $pct%'
+          : 'Paused';
+    }
+    task.update();
+    saveHistory();
+    notifyListeners();
+  }
+
+  /// Resumes a paused download. yt-dlp continues from the `.part` file.
+  void resumeTask(DownloadTask task) {
+    if (task.status != DownloadStatus.paused) return;
+
+    task.pauseRequested = false;
+    task.status = DownloadStatus.queued;
+    task.metadata = "Resuming...";
+    task.update();
+
+    _startDownload(task, task.savePath ?? "", task.audioOnly);
+    notifyListeners();
+  }
+
+  void _killProcess(Process? process) {
+    if (process == null) return;
+    try {
+      if (Platform.isWindows) {
+        process.kill();
+      } else {
+        process.kill(ProcessSignal.sigint);
+      }
+    } catch (e) {
+      log.add("Error killing process: $e");
+      try {
+        process.kill();
+      } catch (_) {}
     }
   }
 
@@ -568,6 +648,7 @@ class DownloadController extends ChangeNotifier {
     }
 
     if (!task.isPlaylist) {
+      task.pauseRequested = false;
       task.status = DownloadStatus.queued;
       task.progress = 0.0;
       task.metadata = "Retrying...";

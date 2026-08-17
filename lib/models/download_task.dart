@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-enum DownloadStatus { queued, downloading, completed, error }
+enum DownloadStatus { queued, downloading, paused, completed, error }
 
 class DownloadTask extends ChangeNotifier {
   final String id;
@@ -17,6 +17,7 @@ class DownloadTask extends ChangeNotifier {
   String liveOutput = "";
   bool isPlaylist = false;
   List<DownloadTask> children = [];
+  bool pauseRequested = false;
 
   // New fields
   String resolution;
@@ -57,7 +58,7 @@ class DownloadTask extends ChangeNotifier {
       'thumbnail': thumbnail,
       'metadata': metadata,
       'progress': progress,
-      'status': status.index,
+      'status': status.name,
       'isPlaylist': isPlaylist,
       'resolution': resolution,
       'savePath': savePath,
@@ -69,6 +70,23 @@ class DownloadTask extends ChangeNotifier {
   }
 
   factory DownloadTask.fromJson(Map<String, dynamic> json) {
+    final savedStatus = json['status'];
+    DownloadStatus status;
+    if (savedStatus is String) {
+      status = DownloadStatus.values.asNameMap()[savedStatus] ??
+          DownloadStatus.queued;
+    } else if (savedStatus is num) {
+      // Legacy numeric index — maps to the pre-`paused` enum order.
+      status = switch (savedStatus) {
+        0 => DownloadStatus.queued,
+        1 => DownloadStatus.downloading,
+        2 => DownloadStatus.completed,
+        3 => DownloadStatus.error,
+        _ => DownloadStatus.queued,
+      };
+    } else {
+      status = DownloadStatus.queued;
+    }
     return DownloadTask(
       id: json['id'],
       url: json['url'],
@@ -76,7 +94,7 @@ class DownloadTask extends ChangeNotifier {
       thumbnail: json['thumbnail'],
       metadata: json['metadata'],
       progress: (json['progress'] as num).toDouble(),
-      status: DownloadStatus.values[json['status']],
+      status: status,
       isPlaylist: json['isPlaylist'],
       resolution: json['resolution'] ?? "best",
       savePath: json['savePath'],
