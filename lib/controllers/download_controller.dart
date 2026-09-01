@@ -601,6 +601,31 @@ class DownloadController extends ChangeNotifier {
     return (videoSize ?? 0) + (audioSize ?? 0);
   }
 
+  /// Sorted distinct video heights (desc), capped to the first [limit], from
+  /// yt-dlp's `formats` list. Empty when none are usable.
+  static List<int> videoHeights(Map<String, dynamic>? info, {int limit = 5}) {
+    final heights = <int>[];
+    if (info != null && info['formats'] is List) {
+      for (final f in info['formats']) {
+        if (f is! Map) continue;
+        final vcodec = f['vcodec'];
+        final height = f['height'];
+        if (height is! num ||
+            height <= 0 ||
+            vcodec is! String ||
+            vcodec == 'none') {
+          continue;
+        }
+        if (!heights.contains(height)) heights.add(height.toInt());
+      }
+      heights.sort((a, b) => b.compareTo(a));
+      if (limit > 0 && heights.length > limit) {
+        return heights.sublist(0, limit);
+      }
+    }
+    return heights;
+  }
+
   /// Formats a byte count like yt-dlp does (e.g. 104857600 -> "100.00MiB").
   static String formatBytes(int bytes) {
     if (bytes <= 0) return '';

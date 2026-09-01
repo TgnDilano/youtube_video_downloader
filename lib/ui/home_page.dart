@@ -7,16 +7,20 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ytdlapp/controllers/download_controller.dart';
 import 'package:ytdlapp/controllers/convert_controller.dart';
+import 'package:ytdlapp/controllers/schedule_controller.dart';
 import 'package:ytdlapp/controllers/settings_controller.dart';
 import 'package:ytdlapp/models/download_task.dart';
+import 'package:ytdlapp/services/clipboard_watcher.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
 import 'package:ytdlapp/ui/convert_page.dart';
 import 'package:ytdlapp/ui/settings_page.dart';
 import 'package:ytdlapp/ui/widgets/download_card.dart';
 import 'package:ytdlapp/ui/widgets/input_area.dart';
+import 'package:ytdlapp/ui/widgets/clipboard_offer_dialog.dart';
 import 'package:ytdlapp/ui/widgets/cookie_consent_dialog.dart';
 import 'package:ytdlapp/ui/widgets/playlist_options_dialog.dart';
 import 'package:ytdlapp/ui/widgets/resolution_dialog.dart';
+import 'package:ytdlapp/ui/widgets/schedule_dialog.dart';
 import 'package:ytdlapp/ui/widgets/terminal_view.dart';
 import 'package:ytdlapp/ui/widgets/tubemate_controls.dart';
 import 'package:ytdlapp/ui/widgets/tubemate_sidebar.dart';
@@ -28,12 +32,20 @@ class TubemateClone extends StatefulWidget {
   State<TubemateClone> createState() => _TubemateCloneState();
 }
 
-class _TubemateCloneState extends State<TubemateClone> {
+class _TubemateCloneState extends State<TubemateClone>
+    with WidgetsBindingObserver {
   final DownloadController _controller = DownloadController();
   final ConvertController _convertController = ConvertController();
   final SettingsController _settings = SettingsController();
+  final ScheduleController _scheduleController = ScheduleController();
+  final ClipboardWatcher _clipboardWatcher = ClipboardWatcher();
   final TextEditingController _urlController = TextEditingController();
   final FocusNode _urlFocusNode = FocusNode();
+  final Set<String> _offeredUrls = {};
+  final List<String> _clipboardQueue = [];
+  bool _clipboardShowing = false;
+  Timer? _scheduleTimer;
+  bool _startupFired = false;
 
   String? _selectedPath;
   bool _isAudioOnly = false;
@@ -54,6 +66,7 @@ class _TubemateCloneState extends State<TubemateClone> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _urlController.addListener(_onUrlChanged);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _urlFocusNode.requestFocus(),
@@ -66,10 +79,24 @@ class _TubemateCloneState extends State<TubemateClone> {
           _selectedResolution = _settings.defaultResolution;
         });
       }
+      _syncClipboardWatcher();
+      // First prefs load is the earliest point a default folder can exist:
+      // catch any jobs that came due while the app was closed.
+      if (!_startupFired) {
+        _startupFired = true;
+        _fireDueSchedules();
+      }
     });
 
     _controller.addListener(_onControllerChanged);
     _controller.cookieConsentRequester = _requestCookieConsent;
+
+    _clipboardWatcher.addListener(_onClipboardDetected);
+    _syncClipboardWatcher();
+    _scheduleTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _fireDueSchedules(),
+    );
   }
 
   Future<bool> _requestCookieConsent() async {
@@ -81,11 +108,145 @@ class _TubemateCloneState extends State<TubemateClone> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _debounce?.cancel();
+    _scheduleTimer?.cancel();
+    _clipboardWatcher.removeListener(_onClipboardDetected);
+    _clipboardWatcher.dispose();
     _controller.removeListener(_onControllerChanged);
     _urlController.dispose();
     _urlFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // macOS App Nap throttles timers while the window is hidden/minimized,
+    // so catch up the moment the window becomes active again.
+    if (state == AppLifecycleState.resumed) {
+      _fireDueSchedules();
+    }
+  }
+
+  void _syncClipboardWatcher() {
+    if (_settings.isClipboardMonitorEnabled) {
+      _clipboardWatcher.start();
+    } else {
+      _clipboardWatcher.stop();
+    }
+  }
+
+  Future<void> _fireDueSchedules() async {
+    final path = _selectedPath ?? _settings.defaultDownloadPath;
+    if (path == null) return;
+    await _scheduleController.fireDue(
+      enqueue: (p) => _controller.addDownload(
+        p.url,
+        path,
+        p.audioOnly,
+        isPlaylist: p.isPlaylist,
+        playlistItems: p.playlistItems,
+        resolution: p.resolution,
+      ),
+    );
+  }
+
+  void _onClipboardDetected() {
+    final url = _clipboardWatcher.detectedUrl;
+    if (url == null || !mounted) return;
+    _clipboardWatcher.acknowledge(url);
+    if (_offeredUrls.contains(url)) return;
+    _offeredUrls.add(url);
+    if (_controller.tasks.any((t) => t.url == url)) return;
+    _clipboardQueue.add(url);
+    _processClipboardQueue();
+  }
+
+  Future<void> _processClipboardQueue() async {
+    if (_clipboardShowing || !mounted) return;
+    _clipboardShowing = true;
+    try {
+      while (_clipboardQueue.isNotEmpty && mounted) {
+        if (!mounted) return;
+        final url = _clipboardQueue.removeAt(0);
+        final result = await showClipboardOfferDialog(
+          context,
+          url: url,
+          controller: _controller,
+          initialResolution: _settings.defaultResolution,
+        );
+        if (!mounted) return;
+        if (result == null) continue;
+        switch (result.action) {
+          case ClipboardOfferAction.queue:
+            _downloadFromClipboard(url, result);
+          case ClipboardOfferAction.schedule:
+            await _scheduleClipboardUrl(
+              url,
+              resolution: result.resolution,
+              audioOnly: result.audioOnly,
+              title: result.title,
+            );
+        }
+      }
+    } finally {
+      _clipboardShowing = false;
+    }
+  }
+
+  void _downloadFromClipboard(String url, ClipboardOfferResult result) {
+    final path = _selectedPath ?? _settings.defaultDownloadPath;
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Set a download folder first — Settings › Default folder'),
+        ),
+      );
+      return;
+    }
+    _controller.addDownload(
+      url,
+      path,
+      result.audioOnly,
+      resolution: result.audioOnly ? 'best' : result.resolution,
+    );
+  }
+
+  Future<void> _scheduleClipboardUrl(
+    String url, {
+    required String resolution,
+    required bool audioOnly,
+    String? title,
+  }) async {
+    final path = _selectedPath ?? _settings.defaultDownloadPath;
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Set a download folder first — Settings › Default folder'),
+        ),
+      );
+      return;
+    }
+    final when = await showScheduleDialog(
+      context,
+      url: url,
+      title: 'Clipboard link',
+    );
+    if (when == null || !mounted) return;
+    await _scheduleController.schedule(
+      url: url,
+      when: when,
+      audioOnly: audioOnly,
+      resolution: audioOnly ? 'best' : resolution,
+      title: title,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Scheduled • ${describeRelative(when)}')),
+        );
+    }
   }
 
   void _onControllerChanged() {
@@ -331,6 +492,7 @@ class _TubemateCloneState extends State<TubemateClone> {
                 _buildTaskList(filter: "downloading"),
                 _buildTaskList(filter: "completed"),
                 _buildTaskList(filter: "failed"),
+                _buildUpcoming(),
               ],
             ),
           ),
@@ -368,6 +530,7 @@ class _TubemateCloneState extends State<TubemateClone> {
         _buildTaskList(filter: "downloading"),
         _buildTaskList(filter: "completed"),
         _buildTaskList(filter: "failed"),
+        _buildUpcoming(),
       ],
     );
   }
@@ -586,6 +749,8 @@ class _TubemateCloneState extends State<TubemateClone> {
                           }),
                         ),
                         const SizedBox(width: 20),
+                        _ScheduleButton(onPressed: () => _scheduleCurrent()),
+                        const SizedBox(width: 12),
                         RecordButton(onPressed: _startNewDownload),
                       ],
                     ),
@@ -874,55 +1039,64 @@ class _TubemateCloneState extends State<TubemateClone> {
   // ------------------------------------------------------------- Tabs
 
   Widget _buildTabs(BuildContext context) {
-    final counts = [
-      _controller.downloadingTasks.length,
-      _controller.completedTasks.length,
-      _controller.failedTasks.length,
-    ];
-    final labels = ['Downloading', 'History', 'Failed'];
+    return ListenableBuilder(
+      listenable: _scheduleController,
+      builder: (context, _) => ListenableBuilder(
+        listenable: _controller,
+        builder: (context, _) {
+          final counts = [
+            _controller.downloadingTasks.length,
+            _controller.completedTasks.length,
+            _controller.failedTasks.length,
+            _scheduleController.scheduled.length,
+          ];
+          final labels = ['Downloading', 'History', 'Failed', 'Schedule'];
 
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: TColors.line)),
-      ),
-      child: Row(
-        children: [
-          for (var i = 0; i < labels.length; i++) ...[
-            _TabItem(
-              label: labels[i],
-              count: counts[i],
-              active: _activeTab == i,
-              onTap: () => setState(() => _activeTab = i),
+          return Container(
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: TColors.line)),
             ),
-            const SizedBox(width: 30),
-          ],
-          const Spacer(),
-          InkWell(
-            onTap: () => _controller.clearAllHistory(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.delete_sweep_outlined,
-                    size: 12,
-                    color: TColors.textDim,
+            child: Row(
+              children: [
+                for (var i = 0; i < labels.length; i++) ...[
+                  _TabItem(
+                    label: labels[i],
+                    count: counts[i],
+                    active: _activeTab == i,
+                    onTap: () => setState(() => _activeTab = i),
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Clear all',
-                    style: TText.mono(
-                      context,
-                      size: 11,
-                      color: TColors.textDim,
+                  const SizedBox(width: 30),
+                ],
+                const Spacer(),
+                InkWell(
+                  onTap: () => _controller.clearAllHistory(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.delete_sweep_outlined,
+                          size: 12,
+                          color: TColors.textDim,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Clear all',
+                          style: TText.mono(
+                            context,
+                            size: 11,
+                            color: TColors.textDim,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -963,6 +1137,114 @@ class _TubemateCloneState extends State<TubemateClone> {
               onResume: () => _controller.resumeTask(tasks[index]),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildUpcoming() {
+    return ListenableBuilder(
+      listenable: _scheduleController,
+      builder: (context, _) {
+        final items = _scheduleController.scheduled;
+        if (items.isEmpty) {
+          return Center(
+            child: Text(
+              'NO UPCOMING CAPTURES',
+              style: TText.mono(context, size: 11, color: TColors.textDim),
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: EdgeInsets.zero,
+          itemCount: items.length,
+          itemBuilder: (context, index) {
+            final planned = items[index];
+            final resLabel = planned.audioOnly
+                ? 'MP3'
+                : (planned.resolution == 'best'
+                    ? 'BEST'
+                    : '${planned.resolution}P');
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: TColors.panel2,
+                  border: Border.all(color: TColors.line),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule, size: 15, color: TColors.amber),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            planned.title ?? planned.url,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TText.mono(
+                              context,
+                              size: 11.5,
+                              color: TColors.amber,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            [
+                              if (planned.title != null) planned.url,
+                              '${formatPlannedDate(planned.scheduledAt)} · '
+                                  '${describeRelative(planned.scheduledAt)}',
+                            ].join('\n'),
+                            style: TText.mono(
+                              context,
+                              size: 10,
+                              color: TColors.textDim,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: TColors.jackBg,
+                        border: Border.all(color: TColors.line),
+                      ),
+                      child: Text(
+                        '${planned.isPlaylist ? 'PL' : 'VDO'} · $resLabel',
+                        style: TText.mono(
+                          context,
+                          size: 9,
+                          letterSpacing: 0.06,
+                          color: TColors.textMuted,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => _scheduleController.cancel(planned.id),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.close,
+                          size: 14,
+                          color: TColors.textDim,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1070,6 +1352,52 @@ class _TubemateCloneState extends State<TubemateClone> {
     return true;
   }
 
+  /// Queues the current URL/preview as a scheduled capture.
+  Future<void> _scheduleCurrent() async {
+    final path = _selectedPath ?? _settings.defaultDownloadPath;
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select a folder first!")),
+      );
+      return;
+    }
+
+    final String url = _urlController.text.trim();
+    if (url.isEmpty) return;
+
+    final isPlaylist = _currentPreview?['_type'] == 'playlist';
+    final when = await showScheduleDialog(
+      context,
+      url: url,
+      title: _currentPreview?['title'] ?? 'Current capture',
+    );
+    if (when == null || !mounted) return;
+
+    final audioOnly =
+        isPlaylist ? _isAudioOnly : _selectedResolution == 'audio';
+    final resolution =
+        _selectedResolution == 'audio' ? 'best' : _selectedResolution;
+    await _scheduleController.schedule(
+      url: url,
+      when: when,
+      audioOnly: audioOnly,
+      resolution: resolution,
+      isPlaylist: isPlaylist,
+      playlistItems:
+          isPlaylist && !_downloadFullPlaylist && _selectedPlaylistItems.isNotEmpty
+              ? (_selectedPlaylistItems.toList()..sort()).join(',')
+              : null,
+      title: _currentPreview?['title']?.toString(),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('Scheduled • ${describeRelative(when)}')),
+        );
+    }
+  }
+
   void _startNewDownload() async {
     final path = _selectedPath ?? _settings.defaultDownloadPath;
     if (path == null) {
@@ -1136,6 +1464,59 @@ class _TubemateCloneState extends State<TubemateClone> {
 }
 
 // -------------------------------------------------------------- Sub widgets
+
+class _ScheduleButton extends StatefulWidget {
+  final VoidCallback onPressed;
+
+  const _ScheduleButton({required this.onPressed});
+
+  @override
+  State<_ScheduleButton> createState() => _ScheduleButtonState();
+}
+
+class _ScheduleButtonState extends State<_ScheduleButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+          decoration: BoxDecoration(
+            color: TColors.jackBg,
+            border: Border.all(
+              color: _hovered ? TColors.amber : TColors.line,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.schedule,
+                size: 15,
+                color: _hovered ? TColors.amber : TColors.textDim,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'SCHEDULE',
+                style: TText.display(
+                  context,
+                  size: 12,
+                  weight: FontWeight.w600,
+                  color: _hovered ? TColors.amber : TColors.textDim,
+                ).copyWith(letterSpacing: 0.04),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _TabItem extends StatelessWidget {
   final String label;

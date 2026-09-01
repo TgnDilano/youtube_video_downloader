@@ -3,44 +3,52 @@ import 'package:ytdlapp/controllers/download_controller.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
 import 'package:ytdlapp/ui/widgets/tubemate_sidebar.dart';
 
-/// Themed popup to pick a quality for one download.
-/// Fetches real formats lazily via yt-dlp and falls back to Best/Audio.
-/// When [preloadedInfo] already carries a `formats` list (e.g. the preview
-/// fetched for the same video), its heights are used directly without a
-/// redundant yt-dlp call.
-class ResolutionDialog extends StatefulWidget {
+/// Shared quality selector: thumbnail header + lazy format list.
+///
+/// Fetches real formats via yt-dlp, falls back to Best/Audio and reports the
+/// current pick through [onChanged]. Used by both [ResolutionDialog] and the
+/// clipboard offer window.
+class ResolutionPicker extends StatefulWidget {
   final DownloadController controller;
   final String url;
-  final String title;
   final String duration;
   final String thumbnailUrl;
   final int? itemIndex;
-  final String current;
+  final String initial;
   final bool showAudio;
   final Map<String, dynamic>? preloadedInfo;
+  final ValueChanged<String> onChanged;
+  final String selectedLabelPrefix;
+  final double maxListHeight;
+  final ValueChanged<Map<String, dynamic>?>? onInfo;
 
-  const ResolutionDialog({
+  const ResolutionPicker({
     super.key,
     required this.controller,
     required this.url,
-    required this.title,
     required this.duration,
     required this.thumbnailUrl,
-    required this.current,
+    required this.initial,
+    required this.onChanged,
     this.itemIndex,
     this.showAudio = true,
     this.preloadedInfo,
+    this.selectedLabelPrefix = 'CURRENT',
+    this.maxListHeight = 264,
+    this.onInfo,
   });
 
   @override
-  State<ResolutionDialog> createState() => _ResolutionDialogState();
+  State<ResolutionPicker> createState() => _ResolutionPickerState();
 }
 
-class _ResolutionDialogState extends State<ResolutionDialog> {
+class _ResolutionPickerState extends State<ResolutionPicker> {
   bool _loading = true;
   bool _failed = false;
   List<int> _heights = [];
   Map<String, String> _sizeByOption = {};
+  Map<String, dynamic>? _info;
+  late String _selected = widget.initial;
 
   @override
   void initState() {
@@ -68,14 +76,10 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
     }
     if (!mounted) return;
 
-    final heights = _heightsFromInfo(info);
+    final heights = DownloadController.videoHeights(info);
     final sizeByOption = <String, String>{};
     if (info != null) {
-      for (final o in [
-        'best',
-        ...heights.take(5).map((h) => h.toString()),
-        if (widget.showAudio) 'audio',
-      ]) {
+      for (final o in _optionsFrom(heights)) {
         final size = DownloadController.estimateSizeForResolution(info, o);
         if (size != null && size > 0) {
           sizeByOption[o] = DownloadController.formatBytes(size);
@@ -86,23 +90,28 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
     setState(() {
       _loading = false;
       _failed = info == null;
-      _heights = heights.take(5).toList();
+      _heights = heights;
       _sizeByOption = sizeByOption;
+      _info = info;
+      if (!_optionsFrom(heights).contains(_selected)) {
+        _selected = 'best';
+      }
     });
+    widget.onInfo?.call(info);
   }
 
-  static List<int> _heightsFromInfo(Map<String, dynamic>? info) {
-    final heights = <int>[];
-    if (info != null && info['formats'] is List) {
-      for (final f in info['formats']) {
-        if (f['height'] != null && f['vcodec'] != 'none') {
-          final h = f['height'] as int;
-          if (!heights.contains(h)) heights.add(h);
-        }
-      }
-      heights.sort((a, b) => b.compareTo(a));
-    }
-    return heights;
+  List<String> _optionsFrom(List<int> heights) => [
+        'best',
+        ...heights.map((h) => h.toString()),
+        if (widget.showAudio) 'audio',
+      ];
+
+  List<String> get _options => _optionsFrom(_heights);
+
+  String get _thumb {
+    if (widget.thumbnailUrl.isNotEmpty) return widget.thumbnailUrl;
+    final thumb = _info?['thumbnail'];
+    return thumb is String ? thumb : '';
   }
 
   String _jackLabel(String value) {
@@ -124,12 +133,156 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final options = <String>[
-      'best',
-      ..._heights.map((h) => h.toString()),
-      if (widget.showAudio) 'audio',
-    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+          child: Row(
+            children: [
+              _DialogThumbnail(url: _thumb, width: 64, height: 36),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (widget.itemIndex != null
+                              ? 'ITEM ${widget.itemIndex!.toString().padLeft(2, '0')}'
+                              : 'CAPTURE')
+                          + (widget.duration.isNotEmpty
+                              ? ' · ${widget.duration}'
+                              : ''),
+                      style: TText.mono(
+                        context,
+                        size: 10,
+                        color: TColors.textDim,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${widget.selectedLabelPrefix}: '
+                      '${_optionLabel(_selected).toUpperCase()}',
+                      style: TText.mono(
+                        context,
+                        size: 9.5,
+                        letterSpacing: 0.08,
+                        color: TColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: TColors.lineSoft),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: widget.maxListHeight),
+          child: _loading
+              ? Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      const _PulseDot(),
+                      const SizedBox(width: 10),
+                      Text(
+                        'FETCHING FORMATS…',
+                        style: TText.mono(
+                          context,
+                          size: 11,
+                          color: TColors.textDim,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  children: [
+                    if (_failed)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.error_outline,
+                              size: 13,
+                              color: TColors.red,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'UNABLE TO FETCH FORMATS — RETRYING NOT REQUIRED, BEST WORKS',
+                                style: TText.mono(
+                                  context,
+                                  size: 9.5,
+                                  color: TColors.red,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: _fetchFormats,
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Text(
+                                  'RETRY',
+                                  style: TText.mono(
+                                    context,
+                                    size: 10,
+                                    color: TColors.amber,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    for (final value in _options)
+                      _OptionRow(
+                        jackLabel: _jackLabel(value),
+                        label: _optionLabel(value),
+                        sizeLabel: _sizeByOption[value] ?? '',
+                        selected: _selected == value,
+                        onTap: () => widget.onChanged(value),
+                      ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
 
+/// Themed popup to pick a quality for one download. Pops the chosen value.
+class ResolutionDialog extends StatelessWidget {
+  final DownloadController controller;
+  final String url;
+  final String title;
+  final String duration;
+  final String thumbnailUrl;
+  final int? itemIndex;
+  final String current;
+  final bool showAudio;
+  final Map<String, dynamic>? preloadedInfo;
+
+  const ResolutionDialog({
+    super.key,
+    required this.controller,
+    required this.url,
+    required this.title,
+    required this.duration,
+    required this.thumbnailUrl,
+    required this.current,
+    this.itemIndex,
+    this.showAudio = true,
+    this.preloadedInfo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: TColors.panel2,
       shape: RoundedRectangleBorder(
@@ -158,7 +311,7 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    widget.title,
+                    title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TText.display(
@@ -170,122 +323,16 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-              child: Row(
-                children: [
-                  _DialogThumbnail(
-                    url: widget.thumbnailUrl,
-                    width: 64,
-                    height: 36,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          (widget.itemIndex != null
-                                  ? 'ITEM ${widget.itemIndex!.toString().padLeft(2, '0')}'
-                                  : 'CAPTURE')
-                              + (widget.duration.isNotEmpty
-                                  ? ' · ${widget.duration}'
-                                  : ''),
-                          style: TText.mono(
-                            context,
-                            size: 10,
-                            color: TColors.textDim,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'CURRENT: ${_optionLabel(widget.current).toUpperCase()}',
-                          style: TText.mono(
-                            context,
-                            size: 9.5,
-                            letterSpacing: 0.08,
-                            color: TColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: TColors.lineSoft),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 264),
-              child: _loading
-                  ? Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Row(
-                        children: [
-                          const _PulseDot(),
-                          const SizedBox(width: 10),
-                          Text(
-                            'FETCHING FORMATS…',
-                            style: TText.mono(
-                              context,
-                              size: 11,
-                              color: TColors.textDim,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      children: [
-                        if (_failed)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  size: 13,
-                                  color: TColors.red,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'UNABLE TO FETCH FORMATS — RETRYING NOT REQUIRED, BEST WORKS',
-                                    style: TText.mono(
-                                      context,
-                                      size: 9.5,
-                                      color: TColors.red,
-                                    ),
-                                  ),
-                                ),
-                                InkWell(
-                                  onTap: _fetchFormats,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(4),
-                                    child: Text(
-                                      'RETRY',
-                                      style: TText.mono(
-                                        context,
-                                        size: 10,
-                                        color: TColors.amber,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        for (final value in options)
-                          _OptionRow(
-                            jackLabel: _jackLabel(value),
-                            label: _optionLabel(value),
-                            sizeLabel: _sizeByOption[value] ?? '',
-                            selected: widget.current == value,
-                            onTap: () => Navigator.of(context).pop(value),
-                          ),
-                      ],
-                    ),
+            ResolutionPicker(
+              controller: controller,
+              url: url,
+              duration: duration,
+              thumbnailUrl: thumbnailUrl,
+              itemIndex: itemIndex,
+              initial: current,
+              showAudio: showAudio,
+              preloadedInfo: preloadedInfo,
+              onChanged: (value) => Navigator.of(context).pop(value),
             ),
             const Divider(height: 1, color: TColors.lineSoft),
             Padding(

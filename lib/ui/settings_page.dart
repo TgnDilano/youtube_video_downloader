@@ -168,6 +168,25 @@ class SettingsPage extends StatelessWidget {
                   _SettingRow(
                     leading: const _Jack(
                       child: Icon(
+                        Icons.content_paste_go,
+                        size: 14,
+                        color: TColors.green,
+                      ),
+                    ),
+                    title: 'Clipboard watchdog',
+                    subtitle:
+                        'Detects a copied YouTube link and offers to queue it',
+                    trailing: TubemateSwitch(
+                      value: settings.isClipboardMonitorEnabled,
+                      onChanged: settings.setClipboardMonitor,
+                      activeColor: TColors.green,
+                      glow: true,
+                    ),
+                  ),
+                  const Divider(height: 1, color: TColors.lineSoft),
+                  _SettingRow(
+                    leading: const _Jack(
+                      child: Icon(
                         Icons.key_outlined,
                         size: 14,
                         color: TColors.green,

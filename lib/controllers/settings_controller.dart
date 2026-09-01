@@ -6,6 +6,7 @@ class SettingsController extends ChangeNotifier {
   String _defaultResolution = 'best';
   String? _defaultDownloadPath;
   bool _isAutoPreviewEnabled = true;
+  bool _isClipboardMonitorEnabled = true;
   String _cookieBrowser = 'auto';
   String? _cookiesFile;
 
@@ -21,6 +22,7 @@ class SettingsController extends ChangeNotifier {
   String get defaultResolution => _defaultResolution;
   String? get defaultDownloadPath => _defaultDownloadPath;
   bool get isAutoPreviewEnabled => _isAutoPreviewEnabled;
+  bool get isClipboardMonitorEnabled => _isClipboardMonitorEnabled;
   String get cookieBrowser => _cookieBrowser;
   String? get cookiesFile => _cookiesFile;
 
@@ -43,6 +45,7 @@ class SettingsController extends ChangeNotifier {
     }
 
     _isAutoPreviewEnabled = prefs.getBool('auto_preview') ?? true;
+    _isClipboardMonitorEnabled = prefs.getBool('clipboard_monitor') ?? true;
     _cookieBrowser =
         prefs.getString('cookie_browser') ?? cookieBrowserValues.first;
     _cookiesFile = prefs.getString('cookies_file');
@@ -90,6 +93,13 @@ class SettingsController extends ChangeNotifier {
     _isAutoPreviewEnabled = enabled;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('auto_preview', enabled);
+    notifyListeners();
+  }
+
+  Future<void> setClipboardMonitor(bool enabled) async {
+    _isClipboardMonitorEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('clipboard_monitor', enabled);
     notifyListeners();
   }
 }
