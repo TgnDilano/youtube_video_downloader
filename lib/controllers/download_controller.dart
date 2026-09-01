@@ -23,7 +23,26 @@ class DownloadController extends ChangeNotifier {
   }
 
   void _notifyFailed(DownloadTask task) {
-    _pendingNotifications.add('Download failed: ${task.title}');
+    final reason = _lastOutputError(task);
+    _pendingNotifications.add(
+      reason.isNotEmpty
+          ? 'Download failed: ${task.title} — $reason'
+          : 'Download failed: ${task.title}',
+    );
+    notifyListeners();
+  }
+
+  /// Last `ERROR:` line captured from the yt-dlp output, cleaned up for
+  /// display. Empty string when nothing useful was captured.
+  static String _lastOutputError(DownloadTask task) {
+    final lines =
+        task.liveOutput.split('\n').where((l) => l.trim().isNotEmpty);
+    for (final line in lines.toList().reversed) {
+      if (line.contains('ERROR:') && !line.contains('WARNING:')) {
+        return line.trim();
+      }
+    }
+    return '';
   }
 
   List<DownloadTask> get downloadingTasks => tasks
@@ -649,17 +668,20 @@ class DownloadController extends ChangeNotifier {
         return true;
       } else {
         task.status = DownloadStatus.error;
-        task.metadata = "Error (Exit code $exitCode)";
-        notifyListeners();
+        final reason = _lastOutputError(task);
+        task.metadata = reason.isNotEmpty
+            ? 'Failed • $reason'
+            : "Error (Exit code $exitCode)";
         _notifyFailed(task);
+        notifyListeners();
         return false;
       }
     } catch (e) {
       log.add('--- Download Error: $e ---');
       task.status = DownloadStatus.error;
       task.metadata = "Critical Error: $e";
-      notifyListeners();
       _notifyFailed(task);
+      notifyListeners();
       return false;
     } finally {
       task.update();
