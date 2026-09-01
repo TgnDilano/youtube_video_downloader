@@ -246,7 +246,10 @@ class _ResolutionPickerState extends State<ResolutionPicker> {
                         label: _optionLabel(value),
                         sizeLabel: _sizeByOption[value] ?? '',
                         selected: _selected == value,
-                        onTap: () => widget.onChanged(value),
+                        onTap: () {
+                        setState(() => _selected = value);
+                        widget.onChanged(value);
+                      },
                       ),
                   ],
                 ),

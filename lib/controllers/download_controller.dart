@@ -312,8 +312,11 @@ class DownloadController extends ChangeNotifier {
       tasks.insert(0, task);
       notifyListeners();
 
+      // Metadata is cosmetic — start the download right away and let the
+      // title/thumbnail arrive in the background. Awaiting it here can stall
+      // a scheduled capture for minutes when yt-dlp --dump-json is slow.
       if (metadata == null) {
-        await _fetchMetadata(task);
+        _fetchMetadata(task);
       }
 
       _startDownload(task, savePath, audioOnly);

@@ -10,6 +10,7 @@ import 'package:ytdlapp/controllers/convert_controller.dart';
 import 'package:ytdlapp/controllers/schedule_controller.dart';
 import 'package:ytdlapp/controllers/settings_controller.dart';
 import 'package:ytdlapp/models/download_task.dart';
+import 'package:ytdlapp/models/planned_download.dart';
 import 'package:ytdlapp/services/clipboard_watcher.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
 import 'package:ytdlapp/ui/convert_page.dart';
@@ -59,6 +60,7 @@ class _TubemateCloneState extends State<TubemateClone>
   Map<String, dynamic>? _currentPreview;
   bool _isFetchingPreview = false;
   String _selectedResolution = "best";
+  bool _resolutionPicked = false;
   Set<int> _selectedPlaylistItems = {};
   Map<int, String> _itemResolutions = {};
   Timer? _debounce;
@@ -76,7 +78,9 @@ class _TubemateCloneState extends State<TubemateClone>
       if (mounted) {
         setState(() {
           _selectedPath ??= _settings.defaultDownloadPath;
-          _selectedResolution = _settings.defaultResolution;
+          if (!_resolutionPicked) {
+            _selectedResolution = _settings.defaultResolution;
+          }
         });
       }
       _syncClipboardWatcher();
@@ -94,7 +98,7 @@ class _TubemateCloneState extends State<TubemateClone>
     _clipboardWatcher.addListener(_onClipboardDetected);
     _syncClipboardWatcher();
     _scheduleTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 5),
       (_) => _fireDueSchedules(),
     );
   }
@@ -147,6 +151,9 @@ class _TubemateCloneState extends State<TubemateClone>
         isPlaylist: p.isPlaylist,
         playlistItems: p.playlistItems,
         resolution: p.resolution,
+        metadata: (p.title == null || p.title!.isEmpty)
+            ? null
+            : {'title': p.title},
       ),
     );
   }
@@ -341,8 +348,11 @@ class _TubemateCloneState extends State<TubemateClone>
       _isFetchingPreview = false;
       _currentPreview = info;
       if (info != null) {
-        // Reset resolution to default when new video is fetched
-        _selectedResolution = _settings.defaultResolution;
+        // Keep an explicit resolution choice across preview refetches —
+        // don't silently reset a resolution picked before scheduling.
+        if (!_resolutionPicked) {
+          _selectedResolution = _settings.defaultResolution;
+        }
         // Default selection: every playlist item
         final entries = info['entries'];
         _selectedPlaylistItems = entries is List
@@ -741,6 +751,7 @@ class _TubemateCloneState extends State<TubemateClone>
                           value: _isAudioOnly,
                           onChanged: (v) => setState(() {
                             _isAudioOnly = v;
+                            _resolutionPicked = true;
                             if (v) {
                               _selectedResolution = 'audio';
                             } else if (_selectedResolution == 'audio') {
@@ -1025,6 +1036,7 @@ class _TubemateCloneState extends State<TubemateClone>
     );
     if (chosen != null && mounted) {
       setState(() {
+        _resolutionPicked = true;
         if (chosen == 'audio') {
           _isAudioOnly = true;
           _selectedResolution = 'audio';
@@ -1160,88 +1172,12 @@ class _TubemateCloneState extends State<TubemateClone>
           itemCount: items.length,
           itemBuilder: (context, index) {
             final planned = items[index];
-            final resLabel = planned.audioOnly
-                ? 'MP3'
-                : (planned.resolution == 'best'
-                    ? 'BEST'
-                    : '${planned.resolution}P');
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: TColors.panel2,
-                  border: Border.all(color: TColors.line),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    const Icon(Icons.schedule, size: 15, color: TColors.amber),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            planned.title ?? planned.url,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TText.mono(
-                              context,
-                              size: 11.5,
-                              color: TColors.amber,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            [
-                              if (planned.title != null) planned.url,
-                              '${formatPlannedDate(planned.scheduledAt)} · '
-                                  '${describeRelative(planned.scheduledAt)}',
-                            ].join('\n'),
-                            style: TText.mono(
-                              context,
-                              size: 10,
-                              color: TColors.textDim,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: TColors.jackBg,
-                        border: Border.all(color: TColors.line),
-                      ),
-                      child: Text(
-                        '${planned.isPlaylist ? 'PL' : 'VDO'} · $resLabel',
-                        style: TText.mono(
-                          context,
-                          size: 9,
-                          letterSpacing: 0.06,
-                          color: TColors.textMuted,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () => _scheduleController.cancel(planned.id),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(
-                          Icons.close,
-                          size: 14,
-                          color: TColors.textDim,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              child: _LiveScheduleRow(
+                planned: planned,
+                onFireDue: _fireDueSchedules,
+                onCancel: () => _scheduleController.cancel(planned.id),
               ),
             );
           },
@@ -1307,6 +1243,7 @@ class _TubemateCloneState extends State<TubemateClone>
     );
     if (chosen == null || !mounted) return false;
     setState(() {
+      _resolutionPicked = true;
       if (chosen == 'audio') {
         _isAudioOnly = true;
         _selectedResolution = 'audio';
@@ -1343,6 +1280,7 @@ class _TubemateCloneState extends State<TubemateClone>
     );
     if (opts == null || !mounted) return false;
     setState(() {
+      _resolutionPicked = true;
       _downloadFullPlaylist = opts.fullPlaylist;
       _selectedPlaylistItems = opts.selectedItems;
       _isAudioOnly = opts.audioOnly;
@@ -1396,6 +1334,7 @@ class _TubemateCloneState extends State<TubemateClone>
           SnackBar(content: Text('Scheduled • ${describeRelative(when)}')),
         );
     }
+    _resetPreviewState();
   }
 
   void _startNewDownload() async {
@@ -1454,16 +1393,144 @@ class _TubemateCloneState extends State<TubemateClone>
       );
     }
 
+    _resetPreviewState();
+  }
+
+  void _resetPreviewState() {
     _urlController.clear();
     setState(() {
       _currentPreview = null;
       _isAudioOnly = false;
+      _downloadFullPlaylist = true;
+      _selectedPlaylistItems.clear();
+      _itemResolutions.clear();
+      _resolutionPicked = false;
       _selectedResolution = _settings.defaultResolution;
     });
   }
 }
 
 // -------------------------------------------------------------- Sub widgets
+
+class _LiveScheduleRow extends StatefulWidget {
+  final PlannedDownload planned;
+  final VoidCallback onFireDue;
+  final VoidCallback onCancel;
+
+  const _LiveScheduleRow({
+    required this.planned,
+    required this.onFireDue,
+    required this.onCancel,
+  });
+
+  @override
+  State<_LiveScheduleRow> createState() => _LiveScheduleRowState();
+}
+
+class _LiveScheduleRowState extends State<_LiveScheduleRow> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    // While this row is visible: refresh the countdown every second and
+    // prompt the due check, so the item moves to Downloads right on time.
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {});
+      widget.onFireDue();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final planned = widget.planned;
+    final resLabel = planned.audioOnly
+        ? 'MP3'
+        : (planned.resolution == 'best' ? 'BEST' : '${planned.resolution}P');
+    final due = !planned.scheduledAt.isAfter(DateTime.now());
+    return Container(
+      decoration: BoxDecoration(
+        color: TColors.panel2,
+        border: Border.all(
+          color: due ? TColors.amber : TColors.line,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(
+            due ? Icons.bolt : Icons.schedule,
+            size: 15,
+            color: due ? TColors.amber : TColors.textDim,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  planned.title ?? planned.url,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TText.mono(
+                    context,
+                    size: 11.5,
+                    color: TColors.amber,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  [
+                    if (planned.title != null) planned.url,
+                    '${formatPlannedDate(planned.scheduledAt)} · '
+                        '${describeRelative(planned.scheduledAt)}',
+                  ].join('\n'),
+                  style: TText.mono(
+                    context,
+                    size: 10,
+                    color: TColors.textDim,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: TColors.jackBg,
+              border: Border.all(color: TColors.line),
+            ),
+            child: Text(
+              '${planned.isPlaylist ? 'PL' : 'VDO'} · $resLabel',
+              style: TText.mono(
+                context,
+                size: 9,
+                letterSpacing: 0.06,
+                color: TColors.textMuted,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: widget.onCancel,
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close, size: 14, color: TColors.textDim),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _ScheduleButton extends StatefulWidget {
   final VoidCallback onPressed;
