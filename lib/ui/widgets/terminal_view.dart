@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ytdlapp/controllers/download_controller.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
 
@@ -26,9 +27,39 @@ class _TerminalViewState extends State<TerminalView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Terminal',
-            style: TText.display(context, size: 16, weight: FontWeight.w600),
+          Row(
+            children: [
+              Text(
+                'Terminal',
+                style: TText.display(
+                  context,
+                  size: 16,
+                  weight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              if (widget.controller.log.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    final text = widget.controller.log.join('\n');
+                    Clipboard.setData(ClipboardData(text: text));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Terminal log copied'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Icon(
+                      Icons.copy_rounded,
+                      size: 15,
+                      color: TColors.textDim,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           Expanded(

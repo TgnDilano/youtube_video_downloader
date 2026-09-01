@@ -3,6 +3,7 @@ import 'dart:math' show max;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ytdlapp/controllers/download_controller.dart';
 import 'package:ytdlapp/controllers/convert_controller.dart';
@@ -86,16 +87,57 @@ class _TubemateCloneState extends State<TubemateClone> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(notifications.join('\n')),
           backgroundColor: TColors.red.withValues(alpha: 0.15),
-          action: SnackBarAction(
-            label: 'RETRY',
-            onPressed: () {
-              final failed = _controller.failedTasks;
-              if (failed.isNotEmpty) {
-                _controller.retryTask(failed.first);
-              }
-            },
+          content: Row(
+            children: [
+              Expanded(
+                child: Text(notifications.join('\n')),
+              ),
+              GestureDetector(
+                onTap: () {
+                  Clipboard.setData(
+                    ClipboardData(text: notifications.join('\n')),
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Error copied'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Text(
+                    'COPY',
+                    style: TText.mono(
+                      context,
+                      size: 11,
+                      color: TColors.textDim,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              GestureDetector(
+                onTap: () {
+                  final failed = _controller.failedTasks;
+                  if (failed.isNotEmpty) {
+                    _controller.retryTask(failed.first);
+                  }
+                },
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Text(
+                    'RETRY',
+                    style: TText.mono(
+                      context,
+                      size: 11,
+                      color: TColors.green,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );
