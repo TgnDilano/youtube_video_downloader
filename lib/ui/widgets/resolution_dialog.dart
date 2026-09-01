@@ -40,6 +40,7 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
   bool _loading = true;
   bool _failed = false;
   List<int> _heights = [];
+  Map<String, String> _sizeByOption = {};
 
   @override
   void initState() {
@@ -68,11 +69,25 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
     if (!mounted) return;
 
     final heights = _heightsFromInfo(info);
+    final sizeByOption = <String, String>{};
+    if (info != null) {
+      for (final o in [
+        'best',
+        ...heights.take(5).map((h) => h.toString()),
+        if (widget.showAudio) 'audio',
+      ]) {
+        final size = DownloadController.estimateSizeForResolution(info, o);
+        if (size != null && size > 0) {
+          sizeByOption[o] = DownloadController.formatBytes(size);
+        }
+      }
+    }
 
     setState(() {
       _loading = false;
       _failed = info == null;
       _heights = heights.take(5).toList();
+      _sizeByOption = sizeByOption;
     });
   }
 
@@ -265,6 +280,7 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
                           _OptionRow(
                             jackLabel: _jackLabel(value),
                             label: _optionLabel(value),
+                            sizeLabel: _sizeByOption[value] ?? '',
                             selected: widget.current == value,
                             onTap: () => Navigator.of(context).pop(value),
                           ),
@@ -381,12 +397,14 @@ class _PulseDotState extends State<_PulseDot>
 class _OptionRow extends StatelessWidget {
   final String jackLabel;
   final String label;
+  final String sizeLabel;
   final bool selected;
   final VoidCallback onTap;
 
   const _OptionRow({
     required this.jackLabel,
     required this.label,
+    required this.sizeLabel,
     required this.selected,
     required this.onTap,
   });
@@ -433,8 +451,21 @@ class _OptionRow extends StatelessWidget {
                 ),
               ),
             ),
-            if (selected)
+            if (sizeLabel.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              Text(
+                sizeLabel,
+                style: TText.mono(
+                  context,
+                  size: 9.5,
+                  color: selected ? TColors.amber : TColors.textDim,
+                ),
+              ),
+            ],
+            if (selected) ...[
+              const SizedBox(width: 10),
               const Icon(Icons.check, size: 13, color: TColors.amber),
+            ],
           ],
         ),
       ),

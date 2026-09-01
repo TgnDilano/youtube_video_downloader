@@ -714,6 +714,7 @@ class _TubemateCloneState extends State<TubemateClone> {
   }
 
   Widget _buildResolutionSelector(BuildContext context) {
+    final sizeLabel = _previewSizeLabel();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -722,6 +723,13 @@ class _TubemateCloneState extends State<TubemateClone> {
           explicit: _singleResolutionExplicit,
           onTap: () => _pickSingleResolution(context),
         ),
+        if (sizeLabel.isNotEmpty) ...[
+          const SizedBox(width: 12),
+          Text(
+            sizeLabel,
+            style: TText.mono(context, size: 10.5, color: TColors.textMuted),
+          ),
+        ],
       ],
     );
   }
@@ -730,6 +738,19 @@ class _TubemateCloneState extends State<TubemateClone> {
     if (_selectedResolution == 'audio') return 'Audio MP3';
     if (_selectedResolution == 'best') return 'Best';
     return '${_selectedResolution}p';
+  }
+
+  /// Estimated size of the currently selected resolution, from the preview's
+  /// format list. Empty when unknown.
+  String _previewSizeLabel() {
+    final info = _currentPreview;
+    if (info == null) return '';
+    final size = DownloadController.estimateSizeForResolution(
+      info,
+      _selectedResolution,
+    );
+    if (size == null || size <= 0) return '';
+    return DownloadController.formatBytes(size);
   }
 
   bool get _singleResolutionExplicit =>

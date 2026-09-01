@@ -119,7 +119,12 @@ class DownloadController extends ChangeNotifier {
         task.title = metadata['title'] ?? "Unknown Title";
         task.thumbnail = metadata['thumbnail'] ?? "";
         task.metadata = "YouTube • ${metadata['duration_string'] ?? 'Unknown'}";
-        task.fileSize = formatBytes(_estimateFileSize(metadata));
+        final size = estimateSizeForResolution(
+              metadata,
+              audioOnly ? 'audio' : resolution,
+            ) ??
+            _estimateFileSize(metadata);
+        task.fileSize = formatBytes(size);
       }
 
       tasks.insert(0, task);
@@ -338,7 +343,9 @@ class DownloadController extends ChangeNotifier {
         task.title = data['title'] ?? "Unknown Title";
         task.thumbnail = data['thumbnail'] ?? "";
         task.metadata = "YouTube • ${data['duration_string'] ?? 'Unknown'}";
-        task.fileSize = formatBytes(_estimateFileSize(data));
+        final size = estimateSizeForResolution(data, 'best') ??
+            _estimateFileSize(data);
+        task.fileSize = formatBytes(size);
       } else {
         task.title = "Video info unavailable";
       }
@@ -369,6 +376,41 @@ class DownloadController extends ChangeNotifier {
     final size = f['filesize'] ?? f['filesize_approx'];
     if (size is num && size > 0) return size.toInt();
     return 0;
+  }
+
+  /// Estimated total size (bytes) for a given resolution choice ("best",
+  /// "1080", "720", "audio") taken from yt-dlp's `formats` list: the largest
+  /// video stream at/below the height plus the best audio stream. Returns
+  /// null when the info carries no usable per-format sizes.
+  static int? estimateSizeForResolution(
+    Map<String, dynamic> info,
+    String resolution,
+  ) {
+    final formats = info['formats'];
+    if (formats is! List) return null;
+    final isAudio = resolution == 'audio';
+    final target = isAudio ? null : int.tryParse(resolution);
+    int? videoSize;
+    int? audioSize;
+    for (final f in formats) {
+      if (f is! Map) continue;
+      final vcodec = f['vcodec'];
+      final acodec = f['acodec'];
+      final fs = _filesizeOf(Map<dynamic, dynamic>.from(f));
+      if (fs <= 0) continue;
+      final hasVideo = vcodec is String && vcodec != 'none';
+      final hasAudio = acodec is String && acodec != 'none';
+      if (hasVideo) {
+        final height = f['height'];
+        if (height is num && target != null && height > target) continue;
+        if (fs > (videoSize ?? 0)) videoSize = fs;
+      } else if (hasAudio) {
+        if (fs > (audioSize ?? 0)) audioSize = fs;
+      }
+    }
+    if (isAudio) return audioSize;
+    if (videoSize == null && audioSize == null) return null;
+    return (videoSize ?? 0) + (audioSize ?? 0);
   }
 
   /// Formats a byte count like yt-dlp does (e.g. 104857600 -> "100.00MiB").
