@@ -227,10 +227,10 @@ class _DownloadCardState extends State<DownloadCard>
           TColors.amber,
         ),
       DownloadStatus.paused => (
-          Icons.play_arrow,
-          widget.onResume,
-          'Resume',
-          TColors.green,
+          Icons.close,
+          widget.onRemove,
+          'Remove',
+          TColors.red,
         ),
       _ => (
           Icons.close,
@@ -248,6 +248,13 @@ class _DownloadCardState extends State<DownloadCard>
           color: TColors.amber,
           tooltip: 'Pause',
           onTap: widget.onPause,
+        ),
+      if (task.status == DownloadStatus.paused && widget.onResume != null)
+        _ActionButton(
+          icon: Icons.play_arrow,
+          color: TColors.green,
+          tooltip: 'Resume',
+          onTap: widget.onResume,
         ),
       _ActionButton(
         icon: icon,

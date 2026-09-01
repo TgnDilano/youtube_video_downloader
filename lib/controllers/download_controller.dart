@@ -10,9 +10,20 @@ import 'package:ytdlapp/services/binary_resolver.dart';
 class DownloadController extends ChangeNotifier {
   List<DownloadTask> tasks = [];
   List<String> log = [];
+  final List<String> _pendingNotifications = [];
 
   DownloadController() {
     loadHistory();
+  }
+
+  List<String> consumePendingNotifications() {
+    final copy = List<String>.from(_pendingNotifications);
+    _pendingNotifications.clear();
+    return copy;
+  }
+
+  void _notifyFailed(DownloadTask task) {
+    _pendingNotifications.add('Download failed: ${task.title}');
   }
 
   List<DownloadTask> get downloadingTasks => tasks
@@ -380,6 +391,7 @@ class DownloadController extends ChangeNotifier {
         } else {
           child.status = DownloadStatus.error;
           child.metadata = "Error";
+          _notifyFailed(child);
         }
         task.progress = completed / task.children.length;
         task.update();
@@ -446,6 +458,12 @@ class DownloadController extends ChangeNotifier {
     }
 
     try {
+      if (task.pauseRequested) {
+        task.status = DownloadStatus.paused;
+        task.metadata = "Paused";
+        task.update();
+        return false;
+      }
       task.process = await Process.start(ytDlp, args);
 
       final processCompleter = Completer<void>();
@@ -551,6 +569,8 @@ class DownloadController extends ChangeNotifier {
       } else {
         task.status = DownloadStatus.error;
         task.metadata = "Error (Exit code $exitCode)";
+        notifyListeners();
+        _notifyFailed(task);
         return false;
       }
     } catch (e) {
@@ -558,6 +578,7 @@ class DownloadController extends ChangeNotifier {
       task.status = DownloadStatus.error;
       task.metadata = "Critical Error: $e";
       notifyListeners();
+      _notifyFailed(task);
       return false;
     } finally {
       task.update();
@@ -596,6 +617,8 @@ class DownloadController extends ChangeNotifier {
   void resumeTask(DownloadTask task) {
     if (task.status != DownloadStatus.paused) return;
 
+    // Make sure any lingering process from a previous run is gone.
+    _killProcess(task.process);
     task.pauseRequested = false;
     task.status = DownloadStatus.queued;
     task.metadata = "Resuming...";
@@ -622,7 +645,13 @@ class DownloadController extends ChangeNotifier {
   }
 
   void removeTask(DownloadTask task) {
-    task.process?.kill();
+    _killProcess(task.process);
+    if (task.isPlaylist) {
+      for (final child in task.children) {
+        _killProcess(child.process);
+        child.pauseRequested = false;
+      }
+    }
     // Check if it's a child task
     bool removed = tasks.remove(task);
     if (!removed) {

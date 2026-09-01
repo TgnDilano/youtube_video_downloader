@@ -10,7 +10,6 @@ Future<void> main() async {
   runApp(const TubemateApp());
 }
 
-/// Frameless, fixed-size window on Windows, driven by window_manager.
 Future<void> _initWindow() async {
   if (kIsWeb) return;
   if (defaultTargetPlatform != TargetPlatform.windows &&
@@ -30,7 +29,7 @@ Future<void> _initWindow() async {
   );
 
   await windowManager.waitUntilReadyToShow(options, () async {
-    await windowManager.setResizable(true); // <-- this was your bug
+    await windowManager.setResizable(true);
     await windowManager.setMaximizable(true);
     await windowManager.setMinimizable(true);
 

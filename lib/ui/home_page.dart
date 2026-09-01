@@ -38,6 +38,7 @@ class _TubemateCloneState extends State<TubemateClone> {
   bool _showTerminal = false;
   int _selectedIndex = 0;
   int _activeTab = 0;
+  double _terminalHeight = 250;
 
   // Preview state
   Map<String, dynamic>? _currentPreview;
@@ -63,6 +64,40 @@ class _TubemateCloneState extends State<TubemateClone> {
         });
       }
     });
+
+    _controller.addListener(_onControllerChanged);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.removeListener(_onControllerChanged);
+    _urlController.dispose();
+    _urlFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    final notifications = _controller.consumePendingNotifications();
+    if (notifications.isEmpty || !mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(notifications.join('\n')),
+          backgroundColor: TColors.red.withValues(alpha: 0.15),
+          action: SnackBarAction(
+            label: 'RETRY',
+            onPressed: () {
+              final failed = _controller.failedTasks;
+              if (failed.isNotEmpty) {
+                _controller.retryTask(failed.first);
+              }
+            },
+          ),
+        ),
+      );
   }
 
   void _onUrlChanged() {
@@ -105,20 +140,10 @@ class _TubemateCloneState extends State<TubemateClone> {
     });
   }
 
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _urlController.dispose();
-    _urlFocusNode.dispose();
-    super.dispose();
-  }
-
-  bool get _isTransportActive =>
-      _controller.downloadingTasks.any((t) => t.isPlaylist == false) ||
-      _controller.tasks.any(
+  bool get _isTransportActive => _controller.tasks.any(
         (t) =>
-            t.isPlaylist &&
-            t.status == DownloadStatus.downloading,
+            t.status == DownloadStatus.downloading ||
+            t.status == DownloadStatus.queued,
       );
 
   @override
@@ -206,21 +231,68 @@ class _TubemateCloneState extends State<TubemateClone> {
         _buildTabs(context),
         const SizedBox(height: 18),
 
-        Expanded(
-          child: IndexedStack(
-            index: _activeTab,
-            children: [
-              _buildTaskList(filter: "downloading"),
-              _buildTaskList(filter: "completed"),
-              _buildTaskList(filter: "failed"),
-            ],
-          ),
-        ),
-
         if (_showTerminal) ...[
-          const SizedBox(height: 18),
           Expanded(
-            child: TerminalView(controller: _controller),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final available = constraints.maxHeight;
+                final handleH = 8.0;
+                final termH = _terminalHeight.clamp(100.0, available - 100);
+                final taskH = available - termH - handleH;
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: taskH,
+                      child: IndexedStack(
+                        index: _activeTab,
+                        children: [
+                          _buildTaskList(filter: "downloading"),
+                          _buildTaskList(filter: "completed"),
+                          _buildTaskList(filter: "failed"),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onVerticalDragUpdate: (details) {
+                        setState(() {
+                          _terminalHeight -= details.delta.dy;
+                          _terminalHeight = _terminalHeight.clamp(100.0, available - 100);
+                        });
+                      },
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.resizeUpDown,
+                        child: Container(
+                          height: handleH,
+                          color: TColors.line,
+                          child: Center(
+                            child: Container(
+                              width: 30,
+                              height: 2,
+                              color: TColors.textDim,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: termH,
+                      child: TerminalView(controller: _controller),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ] else ...[
+          Expanded(
+            child: IndexedStack(
+              index: _activeTab,
+              children: [
+                _buildTaskList(filter: "downloading"),
+                _buildTaskList(filter: "completed"),
+                _buildTaskList(filter: "failed"),
+              ],
+            ),
           ),
         ],
       ],
