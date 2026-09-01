@@ -5,6 +5,9 @@ import 'package:ytdlapp/ui/widgets/tubemate_sidebar.dart';
 
 /// Themed popup to pick a quality for one download.
 /// Fetches real formats lazily via yt-dlp and falls back to Best/Audio.
+/// When [preloadedInfo] already carries a `formats` list (e.g. the preview
+/// fetched for the same video), its heights are used directly without a
+/// redundant yt-dlp call.
 class ResolutionDialog extends StatefulWidget {
   final DownloadController controller;
   final String url;
@@ -14,6 +17,7 @@ class ResolutionDialog extends StatefulWidget {
   final int? itemIndex;
   final String current;
   final bool showAudio;
+  final Map<String, dynamic>? preloadedInfo;
 
   const ResolutionDialog({
     super.key,
@@ -25,6 +29,7 @@ class ResolutionDialog extends StatefulWidget {
     required this.current,
     this.itemIndex,
     this.showAudio = true,
+    this.preloadedInfo,
   });
 
   @override
@@ -47,10 +52,31 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
       _loading = true;
       _failed = false;
     });
-    final info =
-        await widget.controller.fetchVideoInfo(widget.url, flatPlaylist: false);
+
+    // Reuse an already-fetched info blob when it carries format data,
+    // avoiding a second yt-dlp round-trip for the same video.
+    final preloaded = widget.preloadedInfo;
+    Map<String, dynamic>? info;
+    if (preloaded != null && preloaded['formats'] is List) {
+      info = preloaded;
+    } else {
+      info = await widget.controller.fetchVideoInfo(
+        widget.url,
+        flatPlaylist: false,
+      );
+    }
     if (!mounted) return;
 
+    final heights = _heightsFromInfo(info);
+
+    setState(() {
+      _loading = false;
+      _failed = info == null;
+      _heights = heights.take(5).toList();
+    });
+  }
+
+  static List<int> _heightsFromInfo(Map<String, dynamic>? info) {
     final heights = <int>[];
     if (info != null && info['formats'] is List) {
       for (final f in info['formats']) {
@@ -61,12 +87,7 @@ class _ResolutionDialogState extends State<ResolutionDialog> {
       }
       heights.sort((a, b) => b.compareTo(a));
     }
-
-    setState(() {
-      _loading = false;
-      _failed = info == null;
-      _heights = heights.take(5).toList();
-    });
+    return heights;
   }
 
   String _jackLabel(String value) {

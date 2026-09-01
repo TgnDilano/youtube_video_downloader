@@ -193,7 +193,8 @@ class _DownloadCardState extends State<DownloadCard>
         '${(task.progress * 100).clamp(0, 100).round()}%',
       DownloadStatus.queued => 'Queued',
     };
-    return '$res · $fmt · $pct';
+    final size = task.fileSize.isNotEmpty ? ' · ${task.fileSize}' : '';
+    return '$res · $fmt · $pct$size';
   }
 
   String _timecode() {

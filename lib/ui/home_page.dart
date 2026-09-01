@@ -761,6 +761,7 @@ class _TubemateCloneState extends State<TubemateClone> {
         thumbnailUrl: _previewThumb(info),
         current: _selectedResolution,
         showAudio: true,
+        preloadedInfo: info,
       ),
     );
     if (chosen != null && mounted) {
@@ -925,6 +926,7 @@ class _TubemateCloneState extends State<TubemateClone> {
             ? 'audio'
             : _settings.defaultResolution,
         showAudio: true,
+        preloadedInfo: info,
       ),
     );
     if (chosen == null || !mounted) return false;

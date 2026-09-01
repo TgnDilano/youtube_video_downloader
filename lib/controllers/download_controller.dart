@@ -119,6 +119,7 @@ class DownloadController extends ChangeNotifier {
         task.title = metadata['title'] ?? "Unknown Title";
         task.thumbnail = metadata['thumbnail'] ?? "";
         task.metadata = "YouTube • ${metadata['duration_string'] ?? 'Unknown'}";
+        task.fileSize = formatBytes(_estimateFileSize(metadata));
       }
 
       tasks.insert(0, task);
@@ -337,6 +338,7 @@ class DownloadController extends ChangeNotifier {
         task.title = data['title'] ?? "Unknown Title";
         task.thumbnail = data['thumbnail'] ?? "";
         task.metadata = "YouTube • ${data['duration_string'] ?? 'Unknown'}";
+        task.fileSize = formatBytes(_estimateFileSize(data));
       } else {
         task.title = "Video info unavailable";
       }
@@ -344,6 +346,43 @@ class DownloadController extends ChangeNotifier {
       task.title = "Error fetching info";
     }
     task.update();
+  }
+
+  /// Best-effort total download size (bytes) guessed from yt-dlp's JSON info,
+  /// preferring the sum of the actual video+audio streams. Returns 0 when
+  /// unknown.
+  static int _estimateFileSize(Map<String, dynamic> info) {
+    int total = 0;
+    final requested = info['requested_formats'];
+    if (requested is List && requested.isNotEmpty) {
+      for (final f in requested) {
+        if (f is Map) {
+          total += _filesizeOf(Map<dynamic, dynamic>.from(f));
+        }
+      }
+      if (total > 0) return total;
+    }
+    return _filesizeOf(info);
+  }
+
+  static int _filesizeOf(Map<dynamic, dynamic> f) {
+    final size = f['filesize'] ?? f['filesize_approx'];
+    if (size is num && size > 0) return size.toInt();
+    return 0;
+  }
+
+  /// Formats a byte count like yt-dlp does (e.g. 104857600 -> "100.00MiB").
+  static String formatBytes(int bytes) {
+    if (bytes <= 0) return '';
+    const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+    var b = bytes.toDouble();
+    var unit = 0;
+    while (b >= 1024 && unit < units.length - 1) {
+      b /= 1024;
+      unit++;
+    }
+    if (unit == 0) return '${bytes}B';
+    return '${b.toStringAsFixed(2)}${units[unit]}';
   }
 
   Future<void> _startDownload(
