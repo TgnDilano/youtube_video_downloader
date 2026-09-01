@@ -10,7 +10,9 @@ import 'package:ytdlapp/models/download_task.dart';
 // verifies yt-dlp resumes from the .part file.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues({
+    'cookie_browser': 'none',
+  });
 
   late Directory workDir;
   late Process server;

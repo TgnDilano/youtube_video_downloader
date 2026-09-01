@@ -6,10 +6,21 @@ class SettingsController extends ChangeNotifier {
   String _defaultResolution = 'best';
   String? _defaultDownloadPath;
   bool _isAutoPreviewEnabled = true;
+  String _cookieBrowser = 'auto';
+
+  static const List<String> cookieBrowserValues = [
+    'auto',
+    'chrome',
+    'edge',
+    'brave',
+    'firefox',
+    'none',
+  ];
 
   String get defaultResolution => _defaultResolution;
   String? get defaultDownloadPath => _defaultDownloadPath;
   bool get isAutoPreviewEnabled => _isAutoPreviewEnabled;
+  String get cookieBrowser => _cookieBrowser;
 
   SettingsController() {
     _loadSettings();
@@ -30,6 +41,8 @@ class SettingsController extends ChangeNotifier {
     }
 
     _isAutoPreviewEnabled = prefs.getBool('auto_preview') ?? true;
+    _cookieBrowser =
+        prefs.getString('cookie_browser') ?? cookieBrowserValues.first;
     notifyListeners();
   }
 
@@ -37,6 +50,14 @@ class SettingsController extends ChangeNotifier {
     _defaultResolution = resolution;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('default_resolution', resolution);
+    notifyListeners();
+  }
+
+  Future<void> setCookieBrowser(String value) async {
+    if (!cookieBrowserValues.contains(value)) return;
+    _cookieBrowser = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cookie_browser', value);
     notifyListeners();
   }
 

@@ -12,6 +12,23 @@ class DownloadController extends ChangeNotifier {
   List<String> log = [];
   final List<String> _pendingNotifications = [];
 
+  static const String _cookieConsentGrantedKey = 'cookie_consent_granted';
+
+  /// Called by the UI right before a download uses a Keychain-protected
+  /// browser (Chrome/Edge/Brave on macOS). Should show a consent disclaimer
+  /// and resolve `true` when the user allows the access.
+  Future<bool> Function()? cookieConsentRequester;
+
+  bool _cookieConsentGranted = false;
+  bool _cookieConsentPrompted = false;
+
+  static const List<String> _browserPreferenceOrder = [
+    'chrome',
+    'edge',
+    'brave',
+    'firefox',
+  ];
+
   DownloadController() {
     loadHistory();
   }
@@ -45,6 +62,114 @@ class DownloadController extends ChangeNotifier {
     return '';
   }
 
+  /// Resolves the `--cookies-from-browser` value for the given setting.
+  /// `auto` picks the first browser whose cookie store exists on this machine;
+  /// an explicit browser name is only used if it is detectable. Returns an
+  /// empty string when no browser should be passed.
+  static String resolveCookieBrowser(String setting) {
+    if (setting == 'none') return '';
+    final candidates = setting == 'auto'
+        ? _browserPreferenceOrder
+        : [setting];
+    for (final browser in candidates) {
+      if (_browserProfileExists(browser)) return browser;
+    }
+    return '';
+  }
+
+  static bool _browserProfileExists(String browser) {
+    final env = Platform.environment;
+    if (Platform.isMacOS) {
+      final home = env['HOME'];
+      if (home == null) return false;
+      final base = '$home/Library/Application Support';
+      switch (browser) {
+        case 'chrome':
+          return Directory('$base/Google/Chrome').existsSync();
+        case 'edge':
+          return Directory('$base/Microsoft Edge').existsSync();
+        case 'brave':
+          return Directory('$base/BraveSoftware/Brave-Browser').existsSync();
+        case 'firefox':
+          return Directory('$base/Firefox').existsSync();
+      }
+    } else if (Platform.isWindows) {
+      final local = env['LOCALAPPDATA'];
+      final roaming = env['APPDATA'];
+      switch (browser) {
+        case 'chrome':
+          return local != null &&
+              Directory(
+                '$local\\Google\\Chrome\\User Data',
+              ).existsSync();
+        case 'edge':
+          return local != null &&
+              Directory('$local\\Microsoft\\Edge\\User Data').existsSync();
+        case 'brave':
+          return local != null &&
+              Directory(
+                '$local\\BraveSoftware\\Brave-Browser\\User Data',
+              ).existsSync();
+        case 'firefox':
+          return roaming != null &&
+              Directory('$roaming\\Mozilla\\Firefox').existsSync();
+      }
+    } else if (Platform.isLinux) {
+      final home = env['HOME'];
+      if (home == null) return false;
+      switch (browser) {
+        case 'chrome':
+          return Directory('$home/.config/google-chrome').existsSync();
+        case 'edge':
+          return Directory('$home/.config/microsoft-edge').existsSync();
+        case 'brave':
+          return Directory(
+            '$home/.config/BraveSoftware/Brave-Browser',
+          ).existsSync();
+        case 'firefox':
+          return Directory('$home/.mozilla/firefox').existsSync();
+      }
+    }
+    return false;
+  }
+
+  /// The browser name that the current setting resolves to ('' when none).
+  Future<String> cookieBrowserToUse() async {
+    final prefs = await SharedPreferences.getInstance();
+    return resolveCookieBrowser(prefs.getString('cookie_browser') ?? 'auto');
+  }
+
+  /// Builds the `--cookies-from-browser` flag pair from the saved setting.
+  /// Returns an empty list when no browser should be used.
+  ///
+  /// Browsers backed by macOS Keychain encryption (Chrome / Edge / Brave)
+  /// require an explicit user consent first — the UI's
+  /// [cookieConsentRequester] shows the disclaimer before the process starts.
+  Future<List<String>> _cookieArgs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final browser =
+        resolveCookieBrowser(prefs.getString('cookie_browser') ?? 'auto');
+    if (browser.isEmpty) return const [];
+
+    if (Platform.isMacOS &&
+        (browser == 'chrome' || browser == 'edge' || browser == 'brave') &&
+        !_cookieConsentGranted &&
+        !_cookieConsentPrompted) {
+      _cookieConsentPrompted = true;
+      final granted =
+          await (cookieConsentRequester?.call() ?? Future.value(false));
+      if (!granted) {
+        // Remember the choice so we don't nag on every request.
+        await prefs.setString('cookie_browser', 'none');
+        return const [];
+      }
+      _cookieConsentGranted = true;
+      await prefs.setBool(_cookieConsentGrantedKey, true);
+    }
+
+    return ['--cookies-from-browser', browser];
+  }
+
   List<DownloadTask> get downloadingTasks => tasks
       .where(
         (t) =>
@@ -62,6 +187,7 @@ class DownloadController extends ChangeNotifier {
 
   Future<void> loadHistory() async {
     final prefs = await SharedPreferences.getInstance();
+    _cookieConsentGranted = prefs.getBool(_cookieConsentGrantedKey) ?? false;
     final historyJson = prefs.getStringList('download_history') ?? [];
     tasks = historyJson
         .map((j) => DownloadTask.fromJson(jsonDecode(j)))
@@ -84,6 +210,7 @@ class DownloadController extends ChangeNotifier {
     try {
       final result = await Process.run(ytDlp, [
         '--dump-single-json',
+        ...await _cookieArgs(),
         if (flatPlaylist) '--flat-playlist',
         if (!flatPlaylist) '--no-playlist',
         url,
@@ -192,7 +319,12 @@ class DownloadController extends ChangeNotifier {
 
     final ytDlp = await _getBinaryPath('yt-dlp');
     try {
-      final args = ['--flat-playlist', '--dump-json', '--newline'];
+      final args = [
+        '--flat-playlist',
+        '--dump-json',
+        '--newline',
+        ...await _cookieArgs(),
+      ];
 
       if (playlistStart != null) {
         args.addAll(['--playlist-start', playlistStart.toString()]);
@@ -355,6 +487,7 @@ class DownloadController extends ChangeNotifier {
       final result = await Process.run(ytDlp, [
         '--dump-json',
         '--no-playlist',
+        ...await _cookieArgs(),
         task.url,
       ]);
       if (result.exitCode == 0) {
@@ -518,6 +651,7 @@ class DownloadController extends ChangeNotifier {
     task.update();
 
     final ytDlp = await _getBinaryPath('yt-dlp');
+    final cookieArgs = await _cookieArgs();
     List<String> args = [];
 
     if (audioOnly) {
@@ -529,6 +663,8 @@ class DownloadController extends ChangeNotifier {
           : 'bv*[height<=${task.resolution}][ext=mp4]+ba[ext=m4a]/b[height<=${task.resolution}][ext=mp4] / bv*[height<=${task.resolution}]+ba/b[height<=${task.resolution}]';
       args = ['-f', format, '--merge-output-format', 'mp4'];
     }
+
+    args.addAll(cookieArgs);
 
     args.addAll([
       '--no-playlist',
@@ -545,6 +681,11 @@ class DownloadController extends ChangeNotifier {
     log.add(
       '--- Starting Download: ${task.title} (Res: ${task.resolution}) ---',
     );
+    if (cookieArgs.isEmpty) {
+      log.add('(no browser cookies — YouTube may block with HTTP 403)');
+    } else {
+      log.add('(using cookies from ${cookieArgs.last} to authenticate)');
+    }
     log.add('yt-dlp ${args.join(' ')}');
     notifyListeners();
 

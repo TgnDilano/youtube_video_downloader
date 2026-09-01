@@ -27,12 +27,28 @@ class SettingsPage extends StatelessWidget {
     (value: '480', label: '480p'),
   ];
 
+  static const List<({String value, String label})> _cookieOptions = [
+    (value: 'auto', label: 'Auto'),
+    (value: 'chrome', label: 'Chrome'),
+    (value: 'edge', label: 'Edge'),
+    (value: 'brave', label: 'Brave'),
+    (value: 'firefox', label: 'Firefox'),
+    (value: 'none', label: 'Off'),
+  ];
+
   String _resolutionLabel(String value) {
     if (value == 'best') return 'Best';
     for (final opt in _resolutionOptions) {
       if (opt.value == value) return opt.label.replaceAll(' · ', '');
     }
     return value;
+  }
+
+  String _cookieLabel(String value) {
+    for (final opt in _cookieOptions) {
+      if (opt.value == value) return opt.label;
+    }
+    return 'Auto';
   }
 
   @override
@@ -146,6 +162,27 @@ class SettingsPage extends StatelessWidget {
                       onChanged: settings.setAutoPreview,
                       activeColor: TColors.green,
                       glow: true,
+                    ),
+                  ),
+                  const Divider(height: 1, color: TColors.lineSoft),
+                  _SettingRow(
+                    leading: const _Jack(
+                      child: Icon(
+                        Icons.key_outlined,
+                        size: 14,
+                        color: TColors.green,
+                      ),
+                    ),
+                    title: 'YouTube cookie source',
+                    subtitle:
+                        'Fixes "HTTP Error 403: Forbidden". Pick the browser '
+                        'you are logged into YouTube with.',
+                    trailing: _DialSelect(
+                      value: settings.cookieBrowser,
+                      label: _cookieLabel(settings.cookieBrowser),
+                      onChanged: settings.setCookieBrowser,
+                      options: _cookieOptions,
+                      accentColor: TColors.green,
                     ),
                   ),
                 ],
@@ -495,16 +532,19 @@ class _DialSelect extends StatelessWidget {
   final String value;
   final String label;
   final ValueChanged<String> onChanged;
+  final List<({String value, String label})> options;
+  final Color accentColor;
 
   const _DialSelect({
     required this.value,
     required this.label,
     required this.onChanged,
+    this.options = SettingsPage._resolutionOptions,
+    this.accentColor = TColors.amber,
   });
 
   @override
   Widget build(BuildContext context) {
-    final options = SettingsPage._resolutionOptions;
     return GestureDetector(
       onTap: () async {
         final box = context.findRenderObject() as RenderBox;
@@ -562,7 +602,7 @@ class _DialSelect extends StatelessWidget {
           children: [
             CustomPaint(
               size: const Size.square(22),
-              painter: _DialPainter(color: TColors.amber),
+              painter: _DialPainter(color: accentColor),
             ),
             const SizedBox(width: 10),
             Text(

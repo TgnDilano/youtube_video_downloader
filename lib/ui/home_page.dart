@@ -14,6 +14,7 @@ import 'package:ytdlapp/ui/convert_page.dart';
 import 'package:ytdlapp/ui/settings_page.dart';
 import 'package:ytdlapp/ui/widgets/download_card.dart';
 import 'package:ytdlapp/ui/widgets/input_area.dart';
+import 'package:ytdlapp/ui/widgets/cookie_consent_dialog.dart';
 import 'package:ytdlapp/ui/widgets/playlist_options_dialog.dart';
 import 'package:ytdlapp/ui/widgets/resolution_dialog.dart';
 import 'package:ytdlapp/ui/widgets/terminal_view.dart';
@@ -68,6 +69,14 @@ class _TubemateCloneState extends State<TubemateClone> {
     });
 
     _controller.addListener(_onControllerChanged);
+    _controller.cookieConsentRequester = _requestCookieConsent;
+  }
+
+  Future<bool> _requestCookieConsent() async {
+    if (!mounted) return false;
+    final browser = await _controller.cookieBrowserToUse();
+    if (!mounted) return false;
+    return showCookieConsentDialog(context, browser);
   }
 
   @override
