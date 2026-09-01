@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' show max;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -179,112 +180,100 @@ class _TubemateCloneState extends State<TubemateClone> {
   // ---------------------------------------------------------------- Home
 
   Widget _buildHome() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildHeader(),
-        const SizedBox(height: 26),
-        InputArea(
-          urlController: _urlController,
-          urlFocusNode: _urlFocusNode,
-          selectedPath: _selectedPath ?? _settings.defaultDownloadPath,
-          onSelectFolder: () async {
-            String? path = await FilePicker.platform.getDirectoryPath();
-            if (path != null) setState(() => _selectedPath = path);
-          },
-          onUrlSubmitted: _onUrlSubmitted,
-          onStartDownload: _startNewDownload,
-        ),
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 26),
+              InputArea(
+                urlController: _urlController,
+                urlFocusNode: _urlFocusNode,
+                selectedPath: _selectedPath ?? _settings.defaultDownloadPath,
+                onSelectFolder: () async {
+                  String? path = await FilePicker.platform.getDirectoryPath();
+                  if (path != null) setState(() => _selectedPath = path);
+                },
+                onUrlSubmitted: _onUrlSubmitted,
+                onStartDownload: _startNewDownload,
+              ),
 
-        if (_isFetchingPreview)
-          Padding(
-            padding: const EdgeInsets.only(top: 18),
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: TColors.green,
-                    boxShadow: [
-                      BoxShadow(color: TColors.green, blurRadius: 6),
+              if (_isFetchingPreview)
+                Padding(
+                  padding: const EdgeInsets.only(top: 18),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: TColors.green,
+                          boxShadow: [
+                            BoxShadow(color: TColors.green, blurRadius: 6),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'FETCHING PREVIEW…',
+                        style: TText.mono(
+                          context,
+                          size: 11,
+                          color: TColors.textDim,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'FETCHING PREVIEW…',
-                  style: TText.mono(
-                    context,
-                    size: 11,
-                    color: TColors.textDim,
-                  ),
+
+              if (_currentPreview != null) _buildCassetteCard(),
+
+              const SizedBox(height: 30),
+              _buildTabs(context),
+            ],
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.only(top: 18),
+          sliver: SliverLayoutBuilder(
+            builder: (context, constraints) {
+              final remaining = max(
+                0.0,
+                constraints.viewportMainAxisExtent -
+                    constraints.precedingScrollExtent,
+              );
+              final taskH = max(200.0, remaining);
+              return SliverToBoxAdapter(
+                child: SizedBox(
+                  height: taskH,
+                  child: _buildTaskArea(taskH),
                 ),
-              ],
-            ),
+              );
+            },
           ),
+        ),
+      ],
+    );
+  }
 
-        if (_currentPreview != null) _buildCassetteCard(),
-
-        const SizedBox(height: 30),
-        _buildTabs(context),
-        const SizedBox(height: 18),
-
-        if (_showTerminal) ...[
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final available = constraints.maxHeight;
-                final handleH = 8.0;
-                final termH = _terminalHeight.clamp(100.0, available - 100);
-                final taskH = available - termH - handleH;
-                return Column(
-                  children: [
-                    SizedBox(
-                      height: taskH,
-                      child: IndexedStack(
-                        index: _activeTab,
-                        children: [
-                          _buildTaskList(filter: "downloading"),
-                          _buildTaskList(filter: "completed"),
-                          _buildTaskList(filter: "failed"),
-                        ],
-                      ),
-                    ),
-                    GestureDetector(
-                      onVerticalDragUpdate: (details) {
-                        setState(() {
-                          _terminalHeight -= details.delta.dy;
-                          _terminalHeight = _terminalHeight.clamp(100.0, available - 100);
-                        });
-                      },
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.resizeUpDown,
-                        child: Container(
-                          height: handleH,
-                          color: TColors.line,
-                          child: Center(
-                            child: Container(
-                              width: 30,
-                              height: 2,
-                              color: TColors.textDim,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      height: termH,
-                      child: TerminalView(controller: _controller),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ] else ...[
-          Expanded(
+  Widget _buildTaskArea(double height) {
+    if (_showTerminal) {
+      final handleH = 8.0;
+      final termMin = 100.0;
+      final maxTerm =
+          (height - handleH - termMin).clamp(0.0, height - handleH);
+      final termH = maxTerm <= termMin
+          ? maxTerm
+          : _terminalHeight.clamp(termMin, maxTerm);
+      final taskH = (height - termH - handleH).clamp(0.0, height);
+      return Column(
+        children: [
+          SizedBox(
+            height: taskH,
             child: IndexedStack(
               index: _activeTab,
               children: [
@@ -294,7 +283,40 @@ class _TubemateCloneState extends State<TubemateClone> {
               ],
             ),
           ),
+          GestureDetector(
+            onVerticalDragUpdate: (details) {
+              setState(() {
+                _terminalHeight -= details.delta.dy;
+              });
+            },
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeUpDown,
+              child: Container(
+                height: handleH,
+                color: TColors.line,
+                child: Center(
+                  child: Container(
+                    width: 30,
+                    height: 2,
+                    color: TColors.textDim,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(
+            height: termH,
+            child: TerminalView(controller: _controller),
+          ),
         ],
+      );
+    }
+    return IndexedStack(
+      index: _activeTab,
+      children: [
+        _buildTaskList(filter: "downloading"),
+        _buildTaskList(filter: "completed"),
+        _buildTaskList(filter: "failed"),
       ],
     );
   }
