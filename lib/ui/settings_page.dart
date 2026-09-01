@@ -185,6 +185,69 @@ class SettingsPage extends StatelessWidget {
                       accentColor: TColors.green,
                     ),
                   ),
+                  const Divider(height: 1, color: TColors.lineSoft),
+                  _SettingRow(
+                    leading: const _Jack(
+                      child: Icon(
+                        Icons.file_open_outlined,
+                        size: 14,
+                        color: TColors.amber,
+                      ),
+                    ),
+                    title: 'Cookies file (safer)',
+                    subtitle: settings.cookiesFile != null
+                        ? 'Priority use in downloads — no Keychain access'
+                        : 'Export a cookies.txt (YouTube log-in) and pick it — '
+                            'narrowest option, no browser access',
+                    trailing: GestureDetector(
+                      onTap: () async {
+                        final picked = await FilePicker.platform.pickFiles(
+                          dialogTitle: 'Select cookies.txt',
+                          type: FileType.any,
+                        );
+                        if (picked != null &&
+                            picked.files.single.path != null) {
+                          settings.setCookiesFile(picked.files.single.path);
+                        } else if (settings.cookiesFile != null) {
+                          // Tapping with a file set clears it.
+                          settings.setCookiesFile(null);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.only(left: 8, right: 14),
+                        decoration: BoxDecoration(
+                          color: TColors.jackBg,
+                          border: Border.all(color: TColors.line),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CustomPaint(
+                              size: const Size.square(22),
+                              painter: _DialPainter(
+                                color: settings.cookiesFile != null
+                                    ? TColors.green
+                                    : TColors.textDim,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              settings.cookiesFile != null
+                                  ? 'SET'
+                                  : 'PICK FILE',
+                              style: TText.mono(
+                                context,
+                                size: 12.5,
+                                color: settings.cookiesFile != null
+                                    ? TColors.green
+                                    : TColors.text,
+                              ).copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -7,6 +7,7 @@ class SettingsController extends ChangeNotifier {
   String? _defaultDownloadPath;
   bool _isAutoPreviewEnabled = true;
   String _cookieBrowser = 'auto';
+  String? _cookiesFile;
 
   static const List<String> cookieBrowserValues = [
     'auto',
@@ -21,6 +22,7 @@ class SettingsController extends ChangeNotifier {
   String? get defaultDownloadPath => _defaultDownloadPath;
   bool get isAutoPreviewEnabled => _isAutoPreviewEnabled;
   String get cookieBrowser => _cookieBrowser;
+  String? get cookiesFile => _cookiesFile;
 
   SettingsController() {
     _loadSettings();
@@ -43,6 +45,7 @@ class SettingsController extends ChangeNotifier {
     _isAutoPreviewEnabled = prefs.getBool('auto_preview') ?? true;
     _cookieBrowser =
         prefs.getString('cookie_browser') ?? cookieBrowserValues.first;
+    _cookiesFile = prefs.getString('cookies_file');
     notifyListeners();
   }
 
@@ -58,6 +61,17 @@ class SettingsController extends ChangeNotifier {
     _cookieBrowser = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('cookie_browser', value);
+    notifyListeners();
+  }
+
+  Future<void> setCookiesFile(String? path) async {
+    _cookiesFile = path;
+    final prefs = await SharedPreferences.getInstance();
+    if (path != null && path.isNotEmpty) {
+      await prefs.setString('cookies_file', path);
+    } else {
+      await prefs.remove('cookies_file');
+    }
     notifyListeners();
   }
 

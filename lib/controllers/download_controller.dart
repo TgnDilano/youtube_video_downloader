@@ -139,34 +139,70 @@ class DownloadController extends ChangeNotifier {
     return resolveCookieBrowser(prefs.getString('cookie_browser') ?? 'auto');
   }
 
-  /// Builds the `--cookies-from-browser` flag pair from the saved setting.
-  /// Returns an empty list when no browser should be used.
+  /// Whether this browser's cookie store sits behind macOS Keychain
+  /// encryption (needs explicit user consent on macOS only).
+  static bool _isKeychainBrowser(String browser) {
+    if (!Platform.isMacOS) return false;
+    return browser == 'chrome' ||
+        browser == 'edge' ||
+        browser == 'brave';
+  }
+
+  /// Builds the auth flag pair for the FIRST attempt of a download.
+  /// Returns an empty list when no credentials should be used.
   ///
-  /// Browsers backed by macOS Keychain encryption (Chrome / Edge / Brave)
-  /// require an explicit user consent first — the UI's
-  /// [cookieConsentRequester] shows the disclaimer before the process starts.
+  /// Priority: an explicit `cookies.txt` file first (narrowest access, no
+  /// Keychain), then Firefox. Keychain-backed browsers (Chrome / Edge /
+  /// Brave on macOS) are skipped here unless consent was already granted —
+  /// they are only ever requested as a last-resort fallback after a 403.
   Future<List<String>> _cookieArgs() async {
     final prefs = await SharedPreferences.getInstance();
+
+    final cookiesFile = prefs.getString('cookies_file');
+    if (cookiesFile != null &&
+        cookiesFile.isNotEmpty &&
+        File(cookiesFile).existsSync()) {
+      return ['--cookies', cookiesFile];
+    }
+
     final browser =
         resolveCookieBrowser(prefs.getString('cookie_browser') ?? 'auto');
     if (browser.isEmpty) return const [];
+    if (_isKeychainBrowser(browser) && !_cookieConsentGranted) return const [];
 
-    if (Platform.isMacOS &&
-        (browser == 'chrome' || browser == 'edge' || browser == 'brave') &&
-        !_cookieConsentGranted &&
-        !_cookieConsentPrompted) {
-      _cookieConsentPrompted = true;
-      final granted =
-          await (cookieConsentRequester?.call() ?? Future.value(false));
-      if (!granted) {
-        // Remember the choice so we don't nag on every request.
-        await prefs.setString('cookie_browser', 'none');
-        return const [];
-      }
-      _cookieConsentGranted = true;
-      await prefs.setBool(_cookieConsentGrantedKey, true);
+    return ['--cookies-from-browser', browser];
+  }
+
+  /// Last-resort auth flags after a 403: asks for the user's consent (once)
+  /// to use a Keychain-backed browser. Returns an empty list when nothing
+  /// more can be tried.
+  Future<List<String>> _keychainFallbackArgs() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // A cookies file already failed; there is nothing safer left to try.
+    final cookiesFile = prefs.getString('cookies_file');
+    if (cookiesFile != null &&
+        cookiesFile.isNotEmpty &&
+        File(cookiesFile).existsSync()) {
+      return const [];
     }
 
+    final browser =
+        resolveCookieBrowser(prefs.getString('cookie_browser') ?? 'auto');
+    if (!_isKeychainBrowser(browser)) return const [];
+    if (_cookieConsentGranted) return ['--cookies-from-browser', browser];
+    if (_cookieConsentPrompted) return const [];
+
+    _cookieConsentPrompted = true;
+    final granted =
+        await (cookieConsentRequester?.call() ?? Future.value(false));
+    if (!granted) {
+      // Remember the choice so we don't nag on every 403.
+      await prefs.setString('cookie_browser', 'none');
+      return const [];
+    }
+    _cookieConsentGranted = true;
+    await prefs.setBool(_cookieConsentGrantedKey, true);
     return ['--cookies-from-browser', browser];
   }
 
@@ -645,13 +681,20 @@ class DownloadController extends ChangeNotifier {
   Future<bool> _executeDownload(
     DownloadTask task,
     String savePath,
-    bool audioOnly,
-  ) async {
+    bool audioOnly, {
+    bool playerFallback = false,
+    bool keychainFallback = false,
+  }) async {
+    task.metadata = playerFallback || keychainFallback
+        ? "Retrying with login/alt player..."
+        : "";
     task.status = DownloadStatus.downloading;
     task.update();
 
     final ytDlp = await _getBinaryPath('yt-dlp');
-    final cookieArgs = await _cookieArgs();
+    final cookieArgs = keychainFallback
+        ? await _keychainFallbackArgs()
+        : await _cookieArgs();
     List<String> args = [];
 
     if (audioOnly) {
@@ -666,6 +709,13 @@ class DownloadController extends ChangeNotifier {
 
     args.addAll(cookieArgs);
 
+    if (playerFallback) {
+      args.addAll([
+        '--extractor-args',
+        'youtube:player_client=android_vr,web_embedded,tv',
+      ]);
+    }
+
     args.addAll([
       '--no-playlist',
       '--newline',
@@ -678,13 +728,21 @@ class DownloadController extends ChangeNotifier {
       task.url,
     ]);
 
-    log.add(
+log.add(
       '--- Starting Download: ${task.title} (Res: ${task.resolution}) ---',
     );
     if (cookieArgs.isEmpty) {
-      log.add('(no browser cookies — YouTube may block with HTTP 403)');
+      log.add('(no login/cookies — YouTube may block with HTTP 403)');
+    } else if (cookieArgs.first == '--cookies') {
+      log.add('(using cookies file: ${cookieArgs.last})');
     } else {
       log.add('(using cookies from ${cookieArgs.last} to authenticate)');
+    }
+    if (playerFallback) {
+      log.add('(403 fallback: alternate player client, no login)');
+    }
+    if (keychainFallback) {
+      log.add('(403 fallback: cookies from browser after user consent)');
     }
     log.add('yt-dlp ${args.join(' ')}');
     notifyListeners();
@@ -808,8 +866,50 @@ class DownloadController extends ChangeNotifier {
         task.metadata = "Completed • ${task.fileSize}";
         return true;
       } else {
-        task.status = DownloadStatus.error;
         final reason = _lastOutputError(task);
+        final looksLike403 = reason.contains('403') ||
+            task.liveOutput.contains('HTTP Error 403') ||
+            task.liveOutput.contains('rate limit') ||
+            task.liveOutput.contains('Sign in to confirm');
+        if (looksLike403 &&
+            !playerFallback &&
+            !keychainFallback &&
+            _isYouTubeUrl(task.url)) {
+          log.add('--- HTTP 403 or bot-check detected — retrying with '
+              'alternate player client (no login) ---');
+          task.liveOutput = '';
+          task.progress = 0.0;
+          task.update();
+          return await _executeDownload(
+            task,
+            savePath,
+            audioOnly,
+            playerFallback: true,
+          );
+        }
+        if (looksLike403 &&
+            playerFallback &&
+            !keychainFallback &&
+            _isYouTubeUrl(task.url)) {
+          final keychainArgs = await _keychainFallbackArgs();
+          if (keychainArgs.isEmpty) {
+            log.add('(no browser login available — giving up)');
+          } else {
+            log.add('--- Still 403 — retrying with browser cookies '
+                '(consent-granted) ---');
+            task.liveOutput = '';
+            task.progress = 0.0;
+            task.update();
+            return await _executeDownload(
+              task,
+              savePath,
+              audioOnly,
+              playerFallback: true,
+              keychainFallback: true,
+            );
+          }
+        }
+        task.status = DownloadStatus.error;
         task.metadata = reason.isNotEmpty
             ? 'Failed • $reason'
             : "Error (Exit code $exitCode)";
@@ -827,6 +927,10 @@ class DownloadController extends ChangeNotifier {
     } finally {
       task.update();
     }
+  }
+
+  static bool _isYouTubeUrl(String url) {
+    return url.contains('youtube.com') || url.contains('youtu.be');
   }
 
   /// Pauses a download. The running yt-dlp process is killed gracefully

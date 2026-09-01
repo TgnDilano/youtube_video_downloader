@@ -118,8 +118,9 @@ class CookieConsentDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'You will only be asked once. You can always change '
-                      'the source or disable it in Settings.',
+                      'Asked once only, changeable or fully disabled in '
+                      'Settings. Prefer an even narrower option? Use a '
+                      'cookies.txt file instead — zero browser access.',
                       style: TText.mono(
                         context,
                         size: 9.5,
