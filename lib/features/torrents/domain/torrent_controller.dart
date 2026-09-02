@@ -49,6 +49,10 @@ class TorrentController extends ChangeNotifier {
     if (task != null) {
       task.isPaused = true;
       task.status = TorrentStatus.paused;
+      // A paused torrent isn't transferring; clear the speeds so the card
+      // doesn't show stale DL/UL values.
+      task.downloadRate = '0 B/s';
+      task.uploadRate = '0 B/s';
       task.update();
       notifyListeners();
     }
@@ -111,8 +115,11 @@ class TorrentController extends ChangeNotifier {
     task.errorMsg = info.errorMsg;
     task.status = info.status;
     task.progress = info.progress;
-    task.downloadRate = _formatRate(info.downloadRate);
-    task.uploadRate = _formatRate(info.uploadRate);
+    // When paused we force the speeds to zero so stale DL/UL values never
+    // linger on the card, regardless of what the engine last reported.
+    final paused = info.status == TorrentStatus.paused;
+    task.downloadRate = paused ? '0 B/s' : _formatRate(info.downloadRate);
+    task.uploadRate = paused ? '0 B/s' : _formatRate(info.uploadRate);
     task.totalDone = info.totalDone;
     task.totalWanted = info.totalWanted;
     task.totalUploaded = info.totalUploaded;

@@ -32,6 +32,9 @@ void main() {
         TorrentSource.magnet('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567'),
         '/tmp',
       );
+      final task = controller.tasks.first;
+      task.downloadRate = '1.5 MiB/s';
+      task.uploadRate = '200 KiB/s';
 
       var notified = 0;
       controller.addListener(() => notified++);
@@ -39,9 +42,12 @@ void main() {
       controller.pause(id);
 
       expect(engine.paused, contains(id));
-      final task = controller.tasks.first;
       expect(task.isPaused, isTrue);
       expect(task.status, TorrentStatus.paused);
+      expect(task.downloadRate, '0 B/s',
+          reason: 'stale download speed must clear on pause');
+      expect(task.uploadRate, '0 B/s',
+          reason: 'stale upload speed must clear on pause');
       expect(notified, greaterThan(0),
           reason: 'UI must rebuild right away on pause');
     });
