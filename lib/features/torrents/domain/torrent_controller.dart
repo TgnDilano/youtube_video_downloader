@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'package:ytdlapp/features/torrents/data/torrent_engine.dart';
@@ -34,19 +36,68 @@ class TorrentController extends ChangeNotifier {
   /// Adds a torrent; [savePath] must be provided (always-prompt policy).
   int addTorrent(TorrentSource source, String savePath) {
     final id = engine.add(source, savePath);
-    _tasks[id] = TorrentTask(id: id, savePath: savePath);
+    _tasks[id] = TorrentTask(id: id, savePath: savePath, source: source);
     notifyListeners();
     return id;
   }
 
-  void pause(int id) => engine.pause(id);
+  /// Pauses a torrent. Updates the task state immediately so the UI reflects
+  /// the pause right away, then lets the engine poll confirm the native state.
+  void pause(int id) {
+    engine.pause(id);
+    final task = _tasks[id];
+    if (task != null) {
+      task.isPaused = true;
+      task.status = TorrentStatus.paused;
+      task.update();
+      notifyListeners();
+    }
+  }
 
-  void resume(int id) => engine.resume(id);
+  /// Resumes a paused torrent. Flips the task state right away so the RESUME
+  /// icon switches back to PAUSE without waiting for the engine poll.
+  void resume(int id) {
+    engine.resume(id);
+    final task = _tasks[id];
+    if (task != null) {
+      task.isPaused = false;
+      if (task.isFinished) {
+        task.status = TorrentStatus.seeding;
+      } else {
+        task.status = TorrentStatus.downloading;
+      }
+      task.update();
+      notifyListeners();
+    }
+  }
 
-  void remove(int id) {
-    engine.remove(id);
+  /// Removes a torrent from the session. Optionally deletes the downloaded
+  /// data and the original `.torrent` file.
+  ///
+  /// Always asks for confirmation before removing (see the UI), because
+  /// removing with [deleteData] discards local files.
+  void remove(
+    int id, {
+    bool deleteData = false,
+    bool deleteTorrentFile = false,
+  }) {
+    final task = _tasks[id];
+    engine.remove(id, deleteFiles: deleteData);
+    if (deleteTorrentFile && task?.source != null) {
+      _deleteOriginalTorrentFile(task!.source!);
+    }
     _tasks.remove(id);
     notifyListeners();
+  }
+
+  static void _deleteOriginalTorrentFile(TorrentSource source) {
+    if (source.kind != TorrentSourceKind.file) return;
+    try {
+      final file = File(source.raw);
+      if (file.existsSync()) file.deleteSync();
+    } catch (_) {
+      // Best effort — deleting the original .torrent is not critical.
+    }
   }
 
   TorrentTask _fromEngine(TorrentEngineSnapshot info) => _apply(

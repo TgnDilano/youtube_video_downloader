@@ -89,9 +89,12 @@ class TorrentEngine {
     lt.LibtorrentFlutter.instance.resumeTorrent(id);
   }
 
-  void remove(int id) {
+  void remove(int id, {bool deleteFiles = false}) {
     if (!_initialized) return;
-    lt.LibtorrentFlutter.instance.removeTorrent(id, deleteFiles: false);
+    lt.LibtorrentFlutter.instance.removeTorrent(
+      id,
+      deleteFiles: deleteFiles,
+    );
     _snapshots.remove(id);
   }
 

@@ -5,6 +5,7 @@ import 'package:ytdlapp/core/theme/app_theme.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_controller.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
+import 'package:ytdlapp/features/torrents/ui/widgets/remove_torrent_dialog.dart';
 import 'package:ytdlapp/features/torrents/ui/widgets/torrent_card.dart';
 
 /// The Torrents transport page: asks for a magnet link or `.torrent` file plus
@@ -107,6 +108,16 @@ class _TorrentsPageState extends State<TorrentsPage> {
     });
   }
 
+  Future<void> _confirmRemove(TorrentTask task) async {
+    final result = await showRemoveTorrentDialog(context, task: task);
+    if (result == null) return;
+    widget.controller.remove(
+      task.id,
+      deleteData: result.deleteData,
+      deleteTorrentFile: result.deleteTorrentFile,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tasks = widget.controller.tasks;
@@ -127,7 +138,7 @@ class _TorrentsPageState extends State<TorrentsPage> {
                         task: task,
                         onPause: () => widget.controller.pause(task.id),
                         onResume: () => widget.controller.resume(task.id),
-                        onRemove: () => widget.controller.remove(task.id),
+                        onRemove: () => _confirmRemove(task),
                       ),
                   ],
                 ),

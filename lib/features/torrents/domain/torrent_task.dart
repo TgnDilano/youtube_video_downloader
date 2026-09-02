@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
+
 /// Lifecycle of a torrent task. `seeding` means the download is at 100% but
 /// we keep uploading by default (user must pause/remove to stop sharing).
 enum TorrentStatus {
@@ -15,6 +17,10 @@ enum TorrentStatus {
 /// types so it can be unit-tested and rendered without touching the engine.
 class TorrentTask extends ChangeNotifier {
   final int id;
+
+  /// The original source this torrent was added from, so the UI can offer to
+  /// delete the original `.torrent` file (for file sources) on removal.
+  TorrentSource? source;
 
   /// Human name once metadata is available; otherwise a placeholder.
   String name;
@@ -35,6 +41,7 @@ class TorrentTask extends ChangeNotifier {
 
   TorrentTask({
     required this.id,
+    this.source,
     this.name = 'Fetching metadata…',
     this.savePath = '',
     this.errorMsg = '',

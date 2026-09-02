@@ -1,0 +1,95 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:ytdlapp/features/torrents/data/torrent_engine.dart';
+import 'package:ytdlapp/features/torrents/domain/torrent_controller.dart';
+import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
+import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
+
+class _FakeEngine extends TorrentEngine {
+  final paused = <int>[];
+  final resumed = <int>[];
+  final removed = <int, bool>{};
+
+  @override
+  int add(TorrentSource source, String savePath) => 1;
+
+  @override
+  void pause(int id) => paused.add(id);
+
+  @override
+  void resume(int id) => resumed.add(id);
+
+  @override
+  void remove(int id, {bool deleteFiles = false}) =>
+      removed[id] = deleteFiles;
+}
+
+void main() {
+  group('TorrentController pause/resume', () {
+    test('pause flips task state immediately so the UI icon changes', () {
+      final engine = _FakeEngine();
+      final controller = TorrentController(engine: engine);
+      final id = controller.addTorrent(
+        TorrentSource.magnet('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567'),
+        '/tmp',
+      );
+
+      var notified = 0;
+      controller.addListener(() => notified++);
+
+      controller.pause(id);
+
+      expect(engine.paused, contains(id));
+      final task = controller.tasks.first;
+      expect(task.isPaused, isTrue);
+      expect(task.status, TorrentStatus.paused);
+      expect(notified, greaterThan(0),
+          reason: 'UI must rebuild right away on pause');
+    });
+
+    test('resume flips task state back to downloading immediately', () {
+      final engine = _FakeEngine();
+      final controller = TorrentController(engine: engine);
+      final id = controller.addTorrent(
+        TorrentSource.magnet('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567'),
+        '/tmp',
+      );
+      controller.pause(id);
+
+      controller.resume(id);
+
+      expect(engine.resumed, contains(id));
+      final task = controller.tasks.first;
+      expect(task.isPaused, isFalse);
+      expect(task.status, TorrentStatus.downloading);
+    });
+
+    test('remove without delete options keeps data and default source file', () {
+      final engine = _FakeEngine();
+      final controller = TorrentController(engine: engine);
+      final id = controller.addTorrent(
+        TorrentSource.file('/tmp/downloads/ubuntu.torrent'),
+        '/tmp',
+      );
+
+      controller.remove(id);
+
+      expect(engine.removed[id], isFalse,
+          reason: 'data files kept by default (deleteFiles=false)');
+      expect(controller.tasks, isEmpty);
+    });
+
+    test('remove with deleteData=true requests file deletion from engine', () {
+      final engine = _FakeEngine();
+      final controller = TorrentController(engine: engine);
+      final id = controller.addTorrent(
+        TorrentSource.magnet('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567'),
+        '/tmp',
+      );
+
+      controller.remove(id, deleteData: true);
+
+      expect(engine.removed[id], isTrue);
+      expect(controller.tasks, isEmpty);
+    });
+  });
+}
