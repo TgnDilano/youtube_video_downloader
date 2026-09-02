@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
-import 'package:ytdlapp/ui/widgets/traffic_lights.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
+import 'package:ytdlapp/core/widgets/traffic_lights.dart';
 
 /// Subtle repeating scanline texture used by the sidebar and thumbnails.
 class Scanlines extends StatelessWidget {

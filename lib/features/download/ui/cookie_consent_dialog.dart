@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
 
 /// Ask the user before granting yt-dlp access to a browser whose cookie store
 /// sits behind macOS Keychain encryption (Chrome / Edge / Brave).

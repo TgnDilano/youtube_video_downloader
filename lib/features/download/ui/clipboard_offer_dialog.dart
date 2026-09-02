@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:ytdlapp/controllers/download_controller.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
-import 'package:ytdlapp/ui/widgets/resolution_dialog.dart';
+import 'package:ytdlapp/features/download/domain/download_controller.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
+import 'package:ytdlapp/features/download/ui/resolution_dialog.dart';
 
 enum ClipboardOfferAction { queue, schedule }
 

@@ -4,8 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ytdlapp/models/download_task.dart';
-import 'package:ytdlapp/services/binary_resolver.dart';
+import 'package:ytdlapp/features/download/domain/download_task.dart';
+import 'package:ytdlapp/core/services/binary_resolver.dart';
 
 class DownloadController extends ChangeNotifier {
   List<DownloadTask> tasks = [];

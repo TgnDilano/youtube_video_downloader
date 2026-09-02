@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ytdlapp/controllers/download_controller.dart';
-import 'package:ytdlapp/models/download_task.dart';
+import 'package:ytdlapp/features/download/domain/download_controller.dart';
+import 'package:ytdlapp/features/download/domain/download_task.dart';
 
 // End-to-end pause/resume test against a local throttled HTTP server.
 // Generates a 24MB file, serves it at ~1.5MB/s, pauses mid-download and

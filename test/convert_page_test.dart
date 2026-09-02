@@ -2,11 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ytdlapp/controllers/convert_controller.dart';
+import 'package:ytdlapp/features/convert/domain/convert_controller.dart';
 import 'package:ytdlapp/main.dart';
-import 'package:ytdlapp/models/convert_task.dart';
-import 'package:ytdlapp/ui/convert_page.dart';
-import 'package:ytdlapp/ui/widgets/tubemate_controls.dart' show RecordButton;
+import 'package:ytdlapp/features/convert/domain/convert_task.dart';
+import 'package:ytdlapp/features/convert/ui/convert_page.dart';
+import 'package:ytdlapp/core/widgets/tubemate_controls.dart' show RecordButton;
 
 void main() {
   testWidgets('Convert tab renders and routes from sidebar', (tester) async {

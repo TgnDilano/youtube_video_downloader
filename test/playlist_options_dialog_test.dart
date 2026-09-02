@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ytdlapp/controllers/download_controller.dart';
+import 'package:ytdlapp/features/download/domain/download_controller.dart';
+import 'package:ytdlapp/features/download/domain/playlist_options.dart';
 import 'package:ytdlapp/main.dart';
-import 'package:ytdlapp/ui/widgets/playlist_options_dialog.dart';
+import 'package:ytdlapp/features/download/ui/playlist_options_dialog.dart';
 
 void main() {
   testWidgets('URL field is focused on launch', (tester) async {

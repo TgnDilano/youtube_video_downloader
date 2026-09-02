@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ytdlapp/controllers/download_controller.dart';
-import 'package:ytdlapp/models/download_task.dart';
-import 'package:ytdlapp/ui/widgets/download_card.dart';
+import 'package:ytdlapp/features/download/domain/download_controller.dart';
+import 'package:ytdlapp/features/download/domain/download_task.dart';
+import 'package:ytdlapp/features/download/ui/download_card.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

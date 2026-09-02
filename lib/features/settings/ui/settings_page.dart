@@ -3,11 +3,11 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:ytdlapp/controllers/download_controller.dart';
-import 'package:ytdlapp/controllers/settings_controller.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
-import 'package:ytdlapp/ui/widgets/color_picker_dialog.dart';
-import 'package:ytdlapp/ui/widgets/tubemate_controls.dart';
+import 'package:ytdlapp/features/download/domain/download_controller.dart';
+import 'package:ytdlapp/features/settings/domain/settings_controller.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
+import 'package:ytdlapp/features/settings/ui/color_picker_dialog.dart';
+import 'package:ytdlapp/core/widgets/tubemate_controls.dart';
 
 class SettingsPage extends StatelessWidget {
   final SettingsController settings;

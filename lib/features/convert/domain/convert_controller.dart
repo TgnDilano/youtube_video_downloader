@@ -4,8 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
-import 'package:ytdlapp/models/convert_task.dart';
-import 'package:ytdlapp/services/binary_resolver.dart';
+import 'package:ytdlapp/features/convert/domain/convert_task.dart';
+import 'package:ytdlapp/core/services/binary_resolver.dart';
 
 /// Drives the local media converter: probes sources with ffprobe and
 /// re-encodes files to the chosen video/audio format with ffmpeg.

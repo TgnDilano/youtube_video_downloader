@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
 
 class SettingsController extends ChangeNotifier {
   String _defaultResolution = 'best';

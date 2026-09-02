@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
 
 /// macOS-style traffic lights (close / minimize / zoom) for the frameless
 /// window. The close button asks for confirmation before exiting.

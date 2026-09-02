@@ -1,11 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:ytdlapp/controllers/convert_controller.dart';
-import 'package:ytdlapp/models/convert_task.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
-import 'package:ytdlapp/ui/widgets/download_card.dart' show VuMeter;
-import 'package:ytdlapp/ui/widgets/tubemate_controls.dart';
+import 'package:ytdlapp/features/convert/domain/convert_controller.dart';
+import 'package:ytdlapp/features/convert/domain/convert_task.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
+import 'package:ytdlapp/core/widgets/vu_meter.dart';
+import 'package:ytdlapp/core/widgets/tubemate_controls.dart';
 
 /// The converter lane: pick a local video/audio file, choose a target
 /// format, and transcode it with the bundled ffmpeg.

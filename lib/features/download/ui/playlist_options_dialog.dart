@@ -1,23 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:ytdlapp/controllers/download_controller.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
-import 'package:ytdlapp/ui/widgets/tubemate_controls.dart';
-import 'package:ytdlapp/ui/widgets/tubemate_sidebar.dart';
-
-/// Result of the playlist pre-queue options dialog.
-class PlaylistOptions {
-  final bool fullPlaylist;
-  final Set<int> selectedItems;
-  final String resolution;
-  final bool audioOnly;
-
-  const PlaylistOptions({
-    required this.fullPlaylist,
-    required this.selectedItems,
-    required this.resolution,
-    required this.audioOnly,
-  });
-}
+import 'package:ytdlapp/core/theme/app_theme.dart';
+import 'package:ytdlapp/core/widgets/tubemate_controls.dart';
+import 'package:ytdlapp/core/widgets/tubemate_sidebar.dart';
+import 'package:ytdlapp/features/download/domain/download_controller.dart';
+import 'package:ytdlapp/features/download/domain/playlist_options.dart';
 
 /// Pre-queue options for a playlist: full vs item selection, default
 /// resolution and audio-only, shown when the user submits a playlist URL.

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ytdlapp/controllers/download_controller.dart';
+import 'package:ytdlapp/features/download/domain/download_controller.dart';
 
 void main() {
   Map format(int height, {int? size, String vcodec = 'avc1', String acodec = 'none'}) {

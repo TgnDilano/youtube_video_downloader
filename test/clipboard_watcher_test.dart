@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ytdlapp/services/clipboard_watcher.dart';
+import 'package:ytdlapp/core/services/clipboard_watcher.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

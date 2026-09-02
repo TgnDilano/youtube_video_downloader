@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:ytdlapp/controllers/settings_controller.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
-import 'package:ytdlapp/ui/home_page.dart';
+import 'package:ytdlapp/features/settings/domain/settings_controller.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
+import 'package:ytdlapp/features/shell/ui/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

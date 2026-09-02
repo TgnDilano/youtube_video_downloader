@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
 
 /// Jack-style toggle switch: bordered track, sliding square knob.
 class TubemateSwitch extends StatelessWidget {

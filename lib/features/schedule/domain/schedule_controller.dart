@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ytdlapp/models/planned_download.dart';
+import 'package:ytdlapp/features/schedule/domain/planned_download.dart';
 
 /// Keeps the list of planned downloads, persists them to local preferences
 /// and launches the ones whose time has come. Survives app restarts.

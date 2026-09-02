@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ytdlapp/ui/app_theme.dart';
+import 'package:ytdlapp/core/theme/app_theme.dart';
 
 /// The jack panel: input URL + output save-location rows.
 class InputArea extends StatelessWidget {
