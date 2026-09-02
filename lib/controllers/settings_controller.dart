@@ -47,8 +47,13 @@ class SettingsController extends ChangeNotifier {
   Color get effectivePrimary => currentScheme.primary;
   Color get effectiveSecondary => currentScheme.secondary;
 
+  /// Resolves once [SharedPreferences] have been read and the saved color
+  /// scheme has been applied to [TColors]. Awaiting it before [runApp] avoids
+  /// the startup flash of the default palette.
+  late final Future<void> ready;
+
   SettingsController() {
-    _loadSettings();
+    ready = _loadSettings();
   }
 
   Future<void> _loadSettings() async {

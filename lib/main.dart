@@ -1,12 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:ytdlapp/controllers/settings_controller.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
 import 'package:ytdlapp/ui/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _initWindow();
+  // Apply the saved color scheme to TColors before the first frame renders so
+  // the app never flashes the default amber palette on startup.
+  final settings = SettingsController();
+  await settings.ready;
   runApp(const TubemateApp());
 }
 
