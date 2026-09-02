@@ -193,7 +193,7 @@ class _ConvertPageState extends State<ConvertPage> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.only(bottom: 18),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: TColors.line)),
       ),
       child: Column(
@@ -245,8 +245,11 @@ class _ConvertPageState extends State<ConvertPage> {
                       border: Border.all(color: TColors.line),
                     ),
                     child: _sourcePath == null
-                        ? const Icon(Icons.insert_drive_file_outlined,
-                            size: 14, color: TColors.amber)
+                        ? Icon(
+                            Icons.insert_drive_file_outlined,
+                            size: 14,
+                            color: TColors.amber,
+                          )
                         : Icon(
                             _isSourceAudio
                                 ? Icons.library_music_outlined
@@ -345,7 +348,7 @@ class _ConvertPageState extends State<ConvertPage> {
   Widget _buildQueueHeader(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: TColors.line)),
       ),
       child: Padding(

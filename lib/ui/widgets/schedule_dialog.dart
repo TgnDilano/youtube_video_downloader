@@ -123,7 +123,7 @@ class _ScheduleDialogState extends State<_ScheduleDialog> {
       backgroundColor: TColors.panel2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
-        side: const BorderSide(color: TColors.line),
+        side: BorderSide(color: TColors.line),
       ),
       child: SizedBox(
         width: 440,
@@ -203,7 +203,7 @@ class _ScheduleDialogState extends State<_ScheduleDialog> {
                 ],
               ),
             ),
-            const Divider(height: 1, color: TColors.lineSoft),
+            Divider(height: 1, color: TColors.lineSoft),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               child: Row(

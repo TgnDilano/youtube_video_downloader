@@ -30,7 +30,7 @@ class CookieConsentDialog extends StatelessWidget {
       backgroundColor: TColors.panel2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
-        side: const BorderSide(color: TColors.line),
+        side: BorderSide(color: TColors.line),
       ),
       child: SizedBox(
         width: 480,
@@ -65,7 +65,7 @@ class CookieConsentDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            const Divider(height: 1, color: TColors.lineSoft),
+            Divider(height: 1, color: TColors.lineSoft),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
               child: Column(
@@ -105,7 +105,7 @@ class CookieConsentDialog extends StatelessWidget {
                 ],
               ),
             ),
-            const Divider(height: 1, color: TColors.lineSoft),
+            Divider(height: 1, color: TColors.lineSoft),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               child: Row(

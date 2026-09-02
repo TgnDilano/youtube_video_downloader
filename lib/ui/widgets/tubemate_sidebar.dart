@@ -91,7 +91,7 @@ class TubemateSidebar extends StatelessWidget {
       width: 84,
       decoration: BoxDecoration(
         color: TColors.panel,
-        border: const Border(right: BorderSide(color: TColors.line)),
+        border: Border(right: BorderSide(color: TColors.line)),
       ),
       child: Stack(
         children: [
@@ -175,7 +175,7 @@ class _Logo extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(color: TColors.amber, width: 1.5),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.check,
             size: 16,
             color: TColors.amber,

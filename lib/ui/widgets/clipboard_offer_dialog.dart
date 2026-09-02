@@ -73,7 +73,7 @@ class _ClipboardOfferDialogState extends State<_ClipboardOfferDialog> {
       backgroundColor: TColors.panel2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
-        side: const BorderSide(color: TColors.line),
+        side: BorderSide(color: TColors.line),
       ),
       child: SizedBox(
         width: 440,
@@ -151,7 +151,7 @@ class _ClipboardOfferDialogState extends State<_ClipboardOfferDialog> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.link, size: 14, color: TColors.amber),
+                    Icon(Icons.link, size: 14, color: TColors.amber),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -185,7 +185,7 @@ class _ClipboardOfferDialogState extends State<_ClipboardOfferDialog> {
               },
               onChanged: (value) => setState(() => _selected = value),
             ),
-            const Divider(height: 1, color: TColors.lineSoft),
+            Divider(height: 1, color: TColors.lineSoft),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               child: Row(

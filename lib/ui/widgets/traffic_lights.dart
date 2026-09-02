@@ -18,7 +18,7 @@ class TrafficLights extends StatelessWidget {
         backgroundColor: TColors.panel2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.zero,
-          side: const BorderSide(color: TColors.line),
+          side: BorderSide(color: TColors.line),
         ),
         child: SizedBox(
           width: 360,
@@ -63,7 +63,7 @@ class TrafficLights extends StatelessWidget {
                   ),
                 ),
               ),
-              const Divider(height: 1, color: TColors.lineSoft),
+              Divider(height: 1, color: TColors.lineSoft),
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,

@@ -177,7 +177,7 @@ class _ResolutionPickerState extends State<ResolutionPicker> {
             ],
           ),
         ),
-        const Divider(height: 1, color: TColors.lineSoft),
+        Divider(height: 1, color: TColors.lineSoft),
         ConstrainedBox(
           constraints: BoxConstraints(maxHeight: widget.maxListHeight),
           child: _loading
@@ -290,7 +290,7 @@ class ResolutionDialog extends StatelessWidget {
       backgroundColor: TColors.panel2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
-        side: const BorderSide(color: TColors.line),
+        side: BorderSide(color: TColors.line),
       ),
       child: SizedBox(
         width: 440,
@@ -337,7 +337,7 @@ class ResolutionDialog extends StatelessWidget {
               preloadedInfo: preloadedInfo,
               onChanged: (value) => Navigator.of(context).pop(value),
             ),
-            const Divider(height: 1, color: TColors.lineSoft),
+            Divider(height: 1, color: TColors.lineSoft),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               child: Row(
@@ -375,7 +375,7 @@ class _DialogThumbnail extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         border: Border.all(color: TColors.line),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [TColors.thumbGradA, TColors.thumbGradB, TColors.thumbGradC],
@@ -434,7 +434,7 @@ class _PulseDotState extends State<_PulseDot>
       child: Container(
         width: 6,
         height: 6,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: TColors.green,
           boxShadow: [BoxShadow(color: TColors.green, blurRadius: 6)],
@@ -514,7 +514,7 @@ class _OptionRow extends StatelessWidget {
             ],
             if (selected) ...[
               const SizedBox(width: 10),
-              const Icon(Icons.check, size: 13, color: TColors.amber),
+              Icon(Icons.check, size: 13, color: TColors.amber),
             ],
           ],
         ),

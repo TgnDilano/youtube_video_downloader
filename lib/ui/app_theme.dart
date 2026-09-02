@@ -1,31 +1,156 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// A primary/secondary/main accent combo the user can pick in Settings.
+class TColorScheme {
+  final String id;
+  final String label;
+  final Color main;
+  final Color primary;
+  final Color secondary;
+
+  const TColorScheme({
+    required this.id,
+    required this.label,
+    required this.main,
+    required this.primary,
+    required this.secondary,
+  });
+
+  /// Builds a one-off (custom) scheme from three picked colors.
+  factory TColorScheme.custom({
+    required Color main,
+    required Color primary,
+    required Color secondary,
+  }) {
+    return TColorScheme(
+      id: 'custom',
+      label: 'Custom',
+      main: main,
+      primary: primary,
+      secondary: secondary,
+    );
+  }
+}
+
+/// The default dark structural base shared by all preset schemes; the custom
+/// picker can replace it.
+const Color kDefaultMain = Color(0xFF14120F);
+
+/// Available color schemes: `main` drives the structural neutrals, `primary`
+/// the amber accents and `secondary` the green ones. The first entry is the
+/// app's original palette.
+const List<TColorScheme> kColorSchemes = [
+  TColorScheme(
+    id: 'amber',
+    label: 'Amber / Grass',
+    main: kDefaultMain,
+    primary: Color(0xFFFF8A3D),
+    secondary: Color(0xFF7FD858),
+  ),
+  TColorScheme(
+    id: 'ember',
+    label: 'Ember / Ice',
+    main: kDefaultMain,
+    primary: Color(0xFFEF5350),
+    secondary: Color(0xFF4DD0E1),
+  ),
+  TColorScheme(
+    id: 'violet',
+    label: 'Violet / Gold',
+    main: kDefaultMain,
+    primary: Color(0xFFB388FF),
+    secondary: Color(0xFFFFCB6B),
+  ),
+  TColorScheme(
+    id: 'cyan',
+    label: 'Cyan / Magenta',
+    main: kDefaultMain,
+    primary: Color(0xFF26A5DA),
+    secondary: Color(0xFFEC4E7A),
+  ),
+  TColorScheme(
+    id: 'lime',
+    label: 'Lime / Teal',
+    main: kDefaultMain,
+    primary: Color(0xFFCDDC39),
+    secondary: Color(0xFF26A69A),
+  ),
+  TColorScheme(
+    id: 'crimson',
+    label: 'Crimson / Emerald',
+    main: kDefaultMain,
+    primary: Color(0xFFE53935),
+    secondary: Color(0xFF43A047),
+  ),
+];
+
+TColorScheme? colorSchemeById(String id) {
+  for (final s in kColorSchemes) {
+    if (s.id == id) return s;
+  }
+  return null;
+}
+
 /// Tubemate v2 · Media Transport design system.
 ///
 /// Mirrors the palette and typography from the redesign mockups.
 class TColors {
   TColors._();
 
-  static const Color bg = Color(0xFF14120F);
-  static const Color panel = Color(0xFF1E1B17);
-  static const Color panel2 = Color(0xFF24211C);
-  static const Color counterBg = Color(0xFF1A1712);
-  static const Color jackBg = Color(0xFF100E0B);
-  static const Color line = Color(0xFF322D26);
-  static const Color lineSoft = Color(0xFF26221D);
+  // Structural neutrals are runtime-mutable so the custom "main" color can
+  // retint the whole app. They are derived from the scheme's `main` base.
+  static Color bg = kDefaultMain;
+  static Color panel = const Color(0xFF1E1B17);
+  static Color panel2 = const Color(0xFF24211C);
+  static Color counterBg = const Color(0xFF1A1712);
+  static Color jackBg = const Color(0xFF100E0B);
+  static Color line = const Color(0xFF322D26);
+  static Color lineSoft = const Color(0xFF26221D);
   static const Color text = Color(0xFFF2EDE4);
   static const Color textMuted = Color(0xFF8A8477);
   static const Color textDim = Color(0xFF5C574C);
-  static const Color amber = Color(0xFFFF8A3D);
-  static const Color amberBright = Color(0xFFFFA35E);
-  static const Color amberDim = Color(0xFF7A4A26);
-  static const Color green = Color(0xFF7FD858);
-  static const Color greenDim = Color(0xFF3E5A2E);
+
+  // Accents are runtime-mutable so Settings can swap the color scheme.
+  static Color amber = const Color(0xFFFF8A3D);
+  static Color amberBright = const Color(0xFFFFA35E);
+  static Color amberDim = const Color(0xFF7A4A26);
+  static Color green = const Color(0xFF7FD858);
+  static Color greenDim = const Color(0xFF3E5A2E);
   static const Color red = Color(0xFFE1573F);
   static const Color thumbGradA = Color(0xFF3A2A5C);
   static const Color thumbGradB = Color(0xFFC23B7A);
-  static const Color thumbGradC = Color(0xFFFF8A3D);
+  static Color thumbGradC = const Color(0xFFFF8A3D);
+
+  /// Fires whenever [applyScheme] swaps the accents. The app listens and
+  /// rebuilds so the new colors take effect immediately.
+  static final ValueNotifier<int> accentRevision = ValueNotifier<int>(0);
+
+  static void applyScheme(TColorScheme scheme) {
+    // Structural neutrals are a fixed ladder of lightness steps above the
+    // scheme's `main` base, which reproduces the original dark palette.
+    bg = scheme.main;
+    panel = _shift(scheme.main, lighten: 0.035);
+    panel2 = _shift(scheme.main, lighten: 0.057);
+    counterBg = _shift(scheme.main, lighten: 0.017);
+    jackBg = _shift(scheme.main, darken: 0.017);
+    line = _shift(scheme.main, lighten: 0.104);
+    lineSoft = _shift(scheme.main, lighten: 0.063);
+
+    amber = scheme.primary;
+    amberBright = _shift(scheme.primary, lighten: 0.10);
+    amberDim = _shift(scheme.primary, darken: 0.28);
+    green = scheme.secondary;
+    greenDim = _shift(scheme.secondary, darken: 0.28);
+    thumbGradC = scheme.primary;
+    accentRevision.value++;
+  }
+
+  static Color _shift(Color c, {double lighten = 0, double darken = 0}) {
+    final hsl = HSLColor.fromColor(c);
+    final lightness = (hsl.lightness + lighten - darken).clamp(0.0, 1.0);
+    return hsl.withLightness(lightness).toColor();
+  }
 }
 
 /// Typography helpers for the three design families.
@@ -81,7 +206,7 @@ ThemeData buildTubemateTheme(BuildContext context) {
     useMaterial3: false,
     brightness: Brightness.dark,
     scaffoldBackgroundColor: TColors.bg,
-    colorScheme: const ColorScheme.dark(
+    colorScheme: ColorScheme.dark(
       primary: TColors.amber,
       secondary: TColors.green,
       error: TColors.red,
@@ -92,7 +217,7 @@ ThemeData buildTubemateTheme(BuildContext context) {
   );
   return base.copyWith(
     textTheme: _buildTextTheme(context),
-    dividerTheme: const DividerThemeData(
+    dividerTheme: DividerThemeData(
       color: TColors.lineSoft,
       thickness: 1,
       space: 1,

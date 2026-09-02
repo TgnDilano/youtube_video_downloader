@@ -94,6 +94,7 @@ class _TubemateCloneState extends State<TubemateClone>
 
     _controller.addListener(_onControllerChanged);
     _controller.cookieConsentRequester = _requestCookieConsent;
+    TColors.accentRevision.addListener(_onAccentChanged);
 
     _clipboardWatcher.addListener(_onClipboardDetected);
     _syncClipboardWatcher();
@@ -113,6 +114,7 @@ class _TubemateCloneState extends State<TubemateClone>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    TColors.accentRevision.removeListener(_onAccentChanged);
     _debounce?.cancel();
     _scheduleTimer?.cancel();
     _clipboardWatcher.removeListener(_onClipboardDetected);
@@ -130,6 +132,10 @@ class _TubemateCloneState extends State<TubemateClone>
     if (state == AppLifecycleState.resumed) {
       _fireDueSchedules();
     }
+  }
+
+  void _onAccentChanged() {
+    if (mounted) setState(() {});
   }
 
   void _syncClipboardWatcher() {
@@ -431,7 +437,7 @@ class _TubemateCloneState extends State<TubemateClone>
                       Container(
                         width: 6,
                         height: 6,
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: TColors.green,
                           boxShadow: [
@@ -552,7 +558,7 @@ class _TubemateCloneState extends State<TubemateClone>
       children: [
         Container(
           padding: const EdgeInsets.only(bottom: 18),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             border: Border(bottom: BorderSide(color: TColors.line)),
           ),
           child: Row(
@@ -722,7 +728,7 @@ class _TubemateCloneState extends State<TubemateClone>
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: TColors.counterBg,
                   border: Border(top: BorderSide(color: TColors.lineSoft)),
                 ),
@@ -816,7 +822,7 @@ class _TubemateCloneState extends State<TubemateClone>
     final allSelected = selectedCount == total;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: TColors.counterBg,
         border: Border(top: BorderSide(color: TColors.lineSoft)),
       ),
@@ -1065,7 +1071,7 @@ class _TubemateCloneState extends State<TubemateClone>
           final labels = ['Downloading', 'History', 'Failed', 'Schedule'];
 
           return Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: TColors.line)),
             ),
             child: Row(
@@ -1660,7 +1666,7 @@ class _Thumbnail extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         border: Border.all(color: TColors.line),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [TColors.thumbGradA, TColors.thumbGradB, TColors.thumbGradC],

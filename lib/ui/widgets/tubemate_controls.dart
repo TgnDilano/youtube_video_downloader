@@ -5,19 +5,20 @@ import 'package:ytdlapp/ui/app_theme.dart';
 class TubemateSwitch extends StatelessWidget {
   final bool value;
   final ValueChanged<bool>? onChanged;
-  final Color activeColor;
+  final Color? activeColor;
   final bool glow;
 
   const TubemateSwitch({
     super.key,
     required this.value,
     this.onChanged,
-    this.activeColor = TColors.amber,
+    this.activeColor,
     this.glow = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = activeColor ?? TColors.amber;
     return GestureDetector(
       onTap: onChanged == null ? null : () => onChanged!(!value),
       child: AnimatedContainer(
@@ -25,9 +26,9 @@ class TubemateSwitch extends StatelessWidget {
         width: 40,
         height: 21,
         decoration: BoxDecoration(
-          color: value ? activeColor.withValues(alpha: 0.08) : TColors.jackBg,
+          color: value ? color.withValues(alpha: 0.08) : TColors.jackBg,
           border: Border.all(
-            color: value ? activeColor : TColors.line,
+            color: value ? color : TColors.line,
           ),
         ),
         child: AnimatedAlign(
@@ -39,11 +40,11 @@ class TubemateSwitch extends StatelessWidget {
             height: 15,
             margin: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: value ? activeColor : TColors.textDim,
+              color: value ? color : TColors.textDim,
               boxShadow: value && glow
                   ? [
                       BoxShadow(
-                        color: activeColor.withValues(alpha: 0.6),
+                        color: color.withValues(alpha: 0.6),
                         blurRadius: 6,
                       ),
                     ]

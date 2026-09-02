@@ -153,7 +153,7 @@ class _PlaylistOptionsDialogState extends State<PlaylistOptionsDialog> {
       backgroundColor: TColors.panel2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.zero,
-        side: const BorderSide(color: TColors.line),
+        side: BorderSide(color: TColors.line),
       ),
       child: SizedBox(
         width: 470,
@@ -215,7 +215,7 @@ class _PlaylistOptionsDialogState extends State<PlaylistOptionsDialog> {
                 ],
               ),
             ),
-            const Divider(height: 1, color: TColors.lineSoft),
+            Divider(height: 1, color: TColors.lineSoft),
 
             if (!_fullPlaylist && canSelect)
               ConstrainedBox(
@@ -355,7 +355,7 @@ class _PlaylistOptionsDialogState extends State<PlaylistOptionsDialog> {
                 ),
               ),
 
-            const Divider(height: 1, color: TColors.lineSoft),
+            Divider(height: 1, color: TColors.lineSoft),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
               child: Row(
@@ -389,7 +389,7 @@ class _PlaylistOptionsDialogState extends State<PlaylistOptionsDialog> {
                 ],
               ),
             ),
-            const Divider(height: 1, color: TColors.lineSoft),
+            Divider(height: 1, color: TColors.lineSoft),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               child: Row(
@@ -463,7 +463,7 @@ class _DialogThumbnail extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         border: Border.all(color: TColors.line),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [TColors.thumbGradA, TColors.thumbGradB, TColors.thumbGradC],
@@ -545,7 +545,7 @@ class _ResRow extends StatelessWidget {
               ),
             ),
             if (selected)
-              const Icon(Icons.check, size: 13, color: TColors.amber),
+              Icon(Icons.check, size: 13, color: TColors.amber),
           ],
         ),
       ),

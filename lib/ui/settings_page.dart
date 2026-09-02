@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:ytdlapp/controllers/download_controller.dart';
 import 'package:ytdlapp/controllers/settings_controller.dart';
 import 'package:ytdlapp/ui/app_theme.dart';
+import 'package:ytdlapp/ui/widgets/color_picker_dialog.dart';
 import 'package:ytdlapp/ui/widgets/tubemate_controls.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -51,6 +52,20 @@ class SettingsPage extends StatelessWidget {
     return 'Auto';
   }
 
+  Future<void> _pickColor(
+    BuildContext context, {
+    required String title,
+    required Color initial,
+    required Future<void> Function(Color) onApply,
+  }) async {
+    final picked = await showColorPickerDialog(
+      context,
+      title: title,
+      initial: initial,
+    );
+    if (picked != null) await onApply(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -63,7 +78,7 @@ class SettingsPage extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(bottom: 18),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(bottom: BorderSide(color: TColors.line)),
               ),
               child: Column(
@@ -110,7 +125,7 @@ class SettingsPage extends StatelessWidget {
                     settings.setDefaultDownloadPath(path);
                   }
                 },
-                leading: const _Jack(
+                leading: _Jack(
                   child: Icon(
                     Icons.folder_outlined,
                     size: 14,
@@ -134,7 +149,7 @@ class SettingsPage extends StatelessWidget {
               child: Column(
                 children: [
                   _SettingRow(
-                    leading: const _Jack(
+                    leading: _Jack(
                       monoText: 'HQ',
                     ),
                     title: 'Default resolution',
@@ -145,9 +160,9 @@ class SettingsPage extends StatelessWidget {
                       onChanged: settings.setDefaultResolution,
                     ),
                   ),
-                  const Divider(height: 1, color: TColors.lineSoft),
+                  Divider(height: 1, color: TColors.lineSoft),
                   _SettingRow(
-                    leading: const _Jack(
+                    leading: _Jack(
                       child: Icon(
                         Icons.download_outlined,
                         size: 14,
@@ -164,9 +179,9 @@ class SettingsPage extends StatelessWidget {
                       glow: true,
                     ),
                   ),
-                  const Divider(height: 1, color: TColors.lineSoft),
+                  Divider(height: 1, color: TColors.lineSoft),
                   _SettingRow(
-                    leading: const _Jack(
+                    leading: _Jack(
                       child: Icon(
                         Icons.content_paste_go,
                         size: 14,
@@ -183,9 +198,9 @@ class SettingsPage extends StatelessWidget {
                       glow: true,
                     ),
                   ),
-                  const Divider(height: 1, color: TColors.lineSoft),
+                  Divider(height: 1, color: TColors.lineSoft),
                   _SettingRow(
-                    leading: const _Jack(
+                    leading: _Jack(
                       child: Icon(
                         Icons.key_outlined,
                         size: 14,
@@ -204,9 +219,9 @@ class SettingsPage extends StatelessWidget {
                       accentColor: TColors.green,
                     ),
                   ),
-                  const Divider(height: 1, color: TColors.lineSoft),
+                  Divider(height: 1, color: TColors.lineSoft),
                   _SettingRow(
-                    leading: const _Jack(
+                    leading: _Jack(
                       child: Icon(
                         Icons.file_open_outlined,
                         size: 14,
@@ -271,7 +286,93 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 36),
-            _GroupLabel(index: '03', label: 'Engine'),
+            _GroupLabel(index: '03', label: 'Appearance'),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: TColors.panel2,
+                border: Border.all(color: TColors.line),
+              ),
+              child: Column(
+                children: [
+                  _SettingRow(
+                    leading: _Jack(
+                      child: Icon(
+                        Icons.palette_outlined,
+                        size: 14,
+                        color: TColors.amber,
+                      ),
+                    ),
+                    title: 'Color scheme',
+                    subtitle: 'Pick a preset or tune the three app colors',
+                    trailing: const SizedBox(width: 0),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _SchemeTile(
+                          scheme: TColorScheme.custom(
+                            main: settings.effectiveMain,
+                            primary: settings.effectivePrimary,
+                            secondary: settings.effectiveSecondary,
+                          ),
+                          selected: settings.themeId == 'custom',
+                          onTap: () => settings.setTheme('custom'),
+                        ),
+                        for (final scheme in kColorSchemes)
+                          _SchemeTile(
+                            scheme: scheme,
+                            selected: settings.themeId == scheme.id,
+                            onTap: () => settings.setTheme(scheme.id),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, color: TColors.lineSoft),
+                  _ColorEditorRow(
+                    label: 'App',
+                    color: settings.effectiveMain,
+                    description: 'Background & panels',
+                    onPick: () => _pickColor(
+                      context,
+                      title: 'App color',
+                      initial: settings.effectiveMain,
+                      onApply: settings.setCustomMain,
+                    ),
+                  ),
+                  Divider(height: 1, color: TColors.lineSoft),
+                  _ColorEditorRow(
+                    label: 'Primary',
+                    color: settings.effectivePrimary,
+                    description: 'Amber accents',
+                    onPick: () => _pickColor(
+                      context,
+                      title: 'Primary accent',
+                      initial: settings.effectivePrimary,
+                      onApply: settings.setCustomPrimary,
+                    ),
+                  ),
+                  Divider(height: 1, color: TColors.lineSoft),
+                  _ColorEditorRow(
+                    label: 'Secondary',
+                    color: settings.effectiveSecondary,
+                    description: 'Green accents',
+                    onPick: () => _pickColor(
+                      context,
+                      title: 'Secondary accent',
+                      initial: settings.effectiveSecondary,
+                      onApply: settings.setCustomSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+            const SizedBox(height: 36),
+            _GroupLabel(index: '04', label: 'Engine'),
             const SizedBox(height: 12),
             Container(
               decoration: BoxDecoration(
@@ -291,6 +392,143 @@ class SettingsPage extends StatelessWidget {
 }
 
 // ------------------------------------------------------------ Sub widgets
+
+class _SchemeTile extends StatelessWidget {
+  final TColorScheme scheme;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SchemeTile({
+    required this.scheme,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: TColors.jackBg,
+          border: Border.all(
+            color: selected ? TColors.amber : TColors.line,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SchemeDot(color: scheme.main),
+            const SizedBox(width: 4),
+            _SchemeDot(color: scheme.primary),
+            const SizedBox(width: 4),
+            _SchemeDot(color: scheme.secondary),
+            const SizedBox(width: 8),
+            Text(
+              scheme.label.toUpperCase(),
+              style: TText.mono(
+                context,
+                size: 9,
+                letterSpacing: 0.06,
+                color: selected ? TColors.amber : TColors.textDim,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SchemeDot extends StatelessWidget {
+  final Color color;
+
+  const _SchemeDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+class _ColorEditorRow extends StatelessWidget {
+  final String label;
+  final Color color;
+  final String description;
+  final VoidCallback onPick;
+
+  const _ColorEditorRow({
+    required this.label,
+    required this.color,
+    required this.description,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPick,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: TColors.line),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TText.body(
+                      context,
+                      size: 13.5,
+                      weight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    description,
+                    style: TText.body(
+                      context,
+                      size: 11.5,
+                      color: TColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              _hexLabel(color),
+              style: TText.mono(context, size: 11, color: TColors.textDim),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.chevron_right, size: 15, color: TColors.textDim),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _hexLabel(Color c) {
+    return '#${(c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase()}';
+  }
+}
 
 class _GroupLabel extends StatelessWidget {
   final String index;
@@ -541,7 +779,7 @@ class _EngineGroupState extends State<_EngineGroup> {
   @override
   Widget build(BuildContext context) {
     return _SettingRow(
-      leading: const _Jack(
+      leading: _Jack(
         child: Icon(
           Icons.settings_ethernet,
           size: 14,
@@ -615,18 +853,19 @@ class _DialSelect extends StatelessWidget {
   final String label;
   final ValueChanged<String> onChanged;
   final List<({String value, String label})> options;
-  final Color accentColor;
+  final Color? accentColor;
 
   const _DialSelect({
     required this.value,
     required this.label,
     required this.onChanged,
     this.options = SettingsPage._resolutionOptions,
-    this.accentColor = TColors.amber,
+    this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final accent = accentColor ?? TColors.amber;
     return GestureDetector(
       onTap: () async {
         final box = context.findRenderObject() as RenderBox;
@@ -641,7 +880,7 @@ class _DialSelect extends StatelessWidget {
           ),
           color: TColors.panel2,
           shape: RoundedRectangleBorder(
-            side: const BorderSide(color: TColors.line),
+            side: BorderSide(color: TColors.line),
             borderRadius: BorderRadius.zero,
           ),
           items: [
@@ -652,7 +891,7 @@ class _DialSelect extends StatelessWidget {
                 child: Row(
                   children: [
                     if (opt.value == value)
-                      const Icon(Icons.check, size: 13, color: TColors.amber)
+                      Icon(Icons.check, size: 13, color: accent)
                     else
                       const SizedBox(width: 13),
                     const SizedBox(width: 8),
@@ -661,9 +900,7 @@ class _DialSelect extends StatelessWidget {
                       style: TText.mono(
                         context,
                         size: 12,
-                        color: opt.value == value
-                            ? TColors.amber
-                            : TColors.text,
+                        color: opt.value == value ? accent : TColors.text,
                       ),
                     ),
                   ],
@@ -682,10 +919,10 @@ class _DialSelect extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CustomPaint(
-              size: const Size.square(22),
-              painter: _DialPainter(color: accentColor),
-            ),
+              CustomPaint(
+                size: const Size.square(22),
+                painter: _DialPainter(color: accent),
+              ),
             const SizedBox(width: 10),
             Text(
               label,
@@ -745,7 +982,7 @@ class _VersionStrip extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: TColors.line)),
       ),
       child: Row(
@@ -757,7 +994,7 @@ class _VersionStrip extends StatelessWidget {
           ),
           Row(
             children: [
-              const Icon(Icons.circle, size: 6, color: TColors.green),
+              Icon(Icons.circle, size: 6, color: TColors.green),
               const SizedBox(width: 8),
               Text(
                 'ALL SYSTEMS NOMINAL',
