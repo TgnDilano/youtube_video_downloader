@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:ytdlapp/features/torrents/data/torrent_engine.dart';
+import 'package:ytdlapp/features/torrents/domain/torrent_file_info.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
 
@@ -41,6 +42,9 @@ class TorrentController extends ChangeNotifier {
     return id;
   }
 
+  /// Lists the files of a torrent via the engine (needs metadata).
+  List<TorrentFileInfo> files(int id) => engine.files(id);
+
   /// Pauses a torrent. Updates the task state immediately so the UI reflects
   /// the pause right away, then lets the engine poll confirm the native state.
   void pause(int id) {
@@ -53,6 +57,7 @@ class TorrentController extends ChangeNotifier {
       // doesn't show stale DL/UL values.
       task.downloadRate = '0 B/s';
       task.uploadRate = '0 B/s';
+      task.eta = '';
       task.update();
       notifyListeners();
     }
@@ -122,14 +127,38 @@ class TorrentController extends ChangeNotifier {
     task.uploadRate = paused ? '0 B/s' : _formatRate(info.uploadRate);
     task.totalDone = info.totalDone;
     task.totalWanted = info.totalWanted;
+    task.totalSize = info.totalWanted;
     task.totalUploaded = info.totalUploaded;
     task.numPeers = info.numPeers;
     task.numSeeds = info.numSeeds;
+    task.eta = _formatEta(
+      remaining: info.totalWanted - info.totalDone,
+      rate: info.downloadRate,
+      paused: paused,
+      finished: info.isFinished,
+    );
     task.isPaused = info.isPaused;
     task.isFinished = info.isFinished;
     task.hasMetadata = info.hasMetadata;
     task.update();
     return task;
+  }
+
+  /// Formats the estimated time remaining, or '' when it can't be estimated
+  /// (no remaining bytes, no rate, paused, or already finished).
+  static String _formatEta({
+    required int remaining,
+    required int rate,
+    required bool paused,
+    required bool finished,
+  }) {
+    if (finished || paused || remaining <= 0 || rate <= 0) return '';
+    final secs = (remaining / rate).ceil();
+    if (secs < 60) return '${secs}s';
+    if (secs < 3600) return '${secs ~/ 60}m ${secs % 60}s';
+    final h = secs ~/ 3600;
+    final m = (secs % 3600) ~/ 60;
+    return '$h h ${m}m';
   }
 
   static String _formatRate(int bytesPerSec) {

@@ -35,6 +35,13 @@ class TorrentTask extends ChangeNotifier {
   int totalUploaded;
   int numPeers;
   int numSeeds;
+
+  /// Total size of the torrent in bytes (same as [totalWanted] once the size
+  /// is known); 0 before metadata / size is available.
+  int totalSize;
+
+  /// Human-readable estimated time remaining ('' when unknown / idle).
+  String eta;
   bool isPaused;
   bool isFinished;
   bool hasMetadata;
@@ -54,6 +61,8 @@ class TorrentTask extends ChangeNotifier {
     this.totalUploaded = 0,
     this.numPeers = 0,
     this.numSeeds = 0,
+    this.totalSize = 0,
+    this.eta = '',
     this.isPaused = false,
     this.isFinished = false,
     this.hasMetadata = false,

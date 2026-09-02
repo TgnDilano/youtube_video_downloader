@@ -10,6 +10,7 @@ class TorrentCard extends StatelessWidget {
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onRemove;
+  final VoidCallback onDetails;
 
   const TorrentCard({
     super.key,
@@ -17,6 +18,7 @@ class TorrentCard extends StatelessWidget {
     required this.onPause,
     required this.onResume,
     required this.onRemove,
+    required this.onDetails,
   });
 
   @override
@@ -76,8 +78,14 @@ class TorrentCard extends StatelessWidget {
               _metric(
                 context,
                 _bytes(task.totalDone),
-                'OF ${_bytes(task.totalWanted)}',
+                task.totalSize > 0
+                    ? 'OF ${_bytes(task.totalSize)}'
+                    : 'SIZE …',
               ),
+              if (task.eta.isNotEmpty) ...[
+                const SizedBox(width: 16),
+                _metric(context, task.eta, 'ETA'),
+              ],
               const Spacer(),
               _metric(context, task.downloadRate, '↓ DL'),
               const SizedBox(width: 16),
@@ -100,7 +108,10 @@ class TorrentCard extends StatelessWidget {
                 _action(context, Icons.play_arrow, 'RESUME', onResume)
               else
                 _action(context, Icons.pause, 'PAUSE', onPause),
-              const SizedBox(width: 8),
+              const SizedBox(width: 16),
+              _action(context, Icons.info_outline, 'DETAILS', onDetails,
+                  dim: true),
+              const Spacer(),
               _action(context, Icons.delete_outline, 'REMOVE', onRemove,
                   danger: true),
             ],
@@ -146,8 +157,13 @@ class TorrentCard extends StatelessWidget {
     String label,
     VoidCallback onTap, {
     bool danger = false,
+    bool dim = false,
   }) {
-    final color = danger ? TColors.red : TColors.amber;
+    final color = danger
+        ? TColors.red
+        : dim
+            ? TColors.textMuted
+            : TColors.amber;
     return GestureDetector(
       onTap: onTap,
       child: Row(

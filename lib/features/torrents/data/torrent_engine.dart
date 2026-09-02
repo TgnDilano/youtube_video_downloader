@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:libtorrent_flutter/libtorrent_flutter.dart' as lt;
 
+import 'package:ytdlapp/features/torrents/domain/torrent_file_info.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
 
@@ -65,9 +66,46 @@ class TorrentEngine {
     if (!lt.LibtorrentFlutter.isInitialized) {
       await lt.LibtorrentFlutter.init();
     }
+    // Always apply the speed tuning — the session may already exist if the
+    // engine re-initializes, and (re)configuring never hurts.
+    _tuneForSpeed();
     _subscription ??=
         lt.LibtorrentFlutter.instance.torrentUpdates.listen(_handleUpdates);
     _initialized = true;
+  }
+
+  /// Applies a speed-oriented session configuration so downloads aren't
+  /// throttled by the engine's conservative defaults: unlimited transfer,
+  /// more concurrent piece requests, DHT + UPnP on, longer stall timeout.
+  void _tuneForSpeed() {
+    try {
+      final engine = lt.LibtorrentFlutter.instance;
+      engine.configureSession(
+        const lt.BtConfig(
+          cacheSize: 128 * 1024 * 1024,
+          readerReadAhead: 95,
+          preloadCache: 50,
+          connectionsLimit: 200,
+          torrentDisconnectTimeout: 300,
+          forceEncrypt: false,
+          disableTcp: false,
+          disableUtp: false,
+          disableUpload: false,
+          disableDht: false,
+          disableUpnp: false,
+          enableIpv6: false,
+          downloadRateLimit: 0,
+          uploadRateLimit: 0,
+          peersListenPort: 0,
+          responsiveMode: true,
+        ),
+      );
+      // Belt-and-braces: even the drop-in speed setters, unlimited.
+      engine.setDownloadLimit(0);
+      engine.setUploadLimit(0);
+    } catch (_) {
+      // Speed tuning is best-effort; never block startup.
+    }
   }
 
   /// Adds a torrent from a magnet URI or a `.torrent` file path.
@@ -87,6 +125,22 @@ class TorrentEngine {
   void resume(int id) {
     if (!_initialized) return;
     lt.LibtorrentFlutter.instance.resumeTorrent(id);
+  }
+
+  /// Lists the files contained in a torrent once its metadata is available.
+  /// Returns an empty list when there's no metadata yet.
+  List<TorrentFileInfo> files(int id) {
+    if (!_initialized || !lt.LibtorrentFlutter.isInitialized) return [];
+    final raw = lt.LibtorrentFlutter.instance.getFiles(id);
+    return [
+      for (final f in raw)
+        TorrentFileInfo(
+          index: f.index,
+          name: f.name,
+          path: f.path,
+          size: f.size,
+        ),
+    ];
   }
 
   void remove(int id, {bool deleteFiles = false}) {

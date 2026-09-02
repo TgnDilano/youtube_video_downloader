@@ -7,6 +7,7 @@ import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
 import 'package:ytdlapp/features/torrents/ui/widgets/remove_torrent_dialog.dart';
 import 'package:ytdlapp/features/torrents/ui/widgets/torrent_card.dart';
+import 'package:ytdlapp/features/torrents/ui/widgets/torrent_details_dialog.dart';
 
 /// The Torrents transport page: asks for a magnet link or `.torrent` file plus
 /// a save folder (always prompted per job), then lists running torrents.
@@ -99,7 +100,16 @@ class _TorrentsPageState extends State<TorrentsPage> {
       );
       return;
     }
-    widget.controller.addTorrent(source, savePath);
+    final id = widget.controller.addTorrent(source, savePath);
+    if (source.kind == TorrentSourceKind.file) {
+      // A .torrent file already carries metadata, so we can show its contents
+      // immediately instead of waiting until the download finishes.
+      final task = widget.controller.tasks.firstWhere(
+        (t) => t.id == id,
+        orElse: () => TorrentTask(id: id),
+      );
+      await _showDetails(task);
+    }
     _magnetController.clear();
     setState(() {
       _filePath = null;
@@ -116,6 +126,18 @@ class _TorrentsPageState extends State<TorrentsPage> {
       deleteData: result.deleteData,
       deleteTorrentFile: result.deleteTorrentFile,
     );
+  }
+
+  Future<void> _showDetails(TorrentTask task) async {
+    // Pull the current file list from the engine so the dialog always shows
+    // fresh content (size may be unknown until metadata arrives).
+    final files = widget.controller.files(task.id);
+    await showTorrentDetailsDialog(
+      context,
+      task: task,
+      files: files,
+    );
+    setState(() {});
   }
 
   @override
@@ -139,6 +161,7 @@ class _TorrentsPageState extends State<TorrentsPage> {
                         onPause: () => widget.controller.pause(task.id),
                         onResume: () => widget.controller.resume(task.id),
                         onRemove: () => _confirmRemove(task),
+                        onDetails: () => _showDetails(task),
                       ),
                   ],
                 ),

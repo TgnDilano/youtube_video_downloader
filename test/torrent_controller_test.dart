@@ -8,6 +8,11 @@ class _FakeEngine extends TorrentEngine {
   final paused = <int>[];
   final resumed = <int>[];
   final removed = <int, bool>{};
+  final Map<int, TorrentEngineSnapshot> injected = {};
+
+  @override
+  Map<int, TorrentEngineSnapshot> get snapshots =>
+      Map.unmodifiable(injected);
 
   @override
   int add(TorrentSource source, String savePath) => 1;
@@ -96,6 +101,77 @@ void main() {
 
       expect(engine.removed[id], isTrue);
       expect(controller.tasks, isEmpty);
+    });
+  });
+
+  group('TorrentController metrics', () {
+    TorrentEngineSnapshot snap({
+      required int id,
+      required bool paused,
+      required bool finished,
+      required int totalWanted,
+      required int totalDone,
+      required int downloadRate,
+    }) =>
+        TorrentEngineSnapshot(
+          id: id,
+          name: 'file',
+          savePath: '/tmp',
+          errorMsg: '',
+          status: paused
+              ? TorrentStatus.paused
+              : finished
+                  ? TorrentStatus.seeding
+                  : TorrentStatus.downloading,
+          progress: totalWanted == 0 ? 0 : totalDone / totalWanted,
+          downloadRate: downloadRate,
+          uploadRate: 0,
+          totalDone: totalDone,
+          totalWanted: totalWanted,
+          totalUploaded: 0,
+          numPeers: 0,
+          numSeeds: 0,
+          isPaused: paused,
+          isFinished: finished,
+          hasMetadata: totalWanted > 0,
+        );
+
+    test('total size and ETA are computed from active download metrics',
+        () async {
+      final e = _FakeEngine();
+      final controller = TorrentController(engine: e);
+      e.injected[1] = snap(
+        id: 1,
+        paused: false,
+        finished: false,
+        totalWanted: 10 * 1024 * 1024,
+        totalDone: 5 * 1024 * 1024,
+        downloadRate: 1024 * 1024,
+      );
+      e.tasksChanged?.call();
+
+      final task = controller.tasks.first;
+      expect(task.totalSize, 10 * 1024 * 1024);
+      // remaining 5 MiB at 1 MiB/s → 5s
+      expect(task.eta, '5s');
+    });
+
+    test('ETA is blank when paused or finished', () async {
+      final e = _FakeEngine();
+      final controller = TorrentController(engine: e);
+      e.injected[1] = snap(
+        id: 1,
+        paused: true,
+        finished: false,
+        totalWanted: 10 * 1024 * 1024,
+        totalDone: 5 * 1024 * 1024,
+        downloadRate: 1024 * 1024,
+      );
+      e.tasksChanged?.call();
+
+      final task = controller.tasks.first;
+      expect(task.downloadRate, '0 B/s');
+      expect(task.eta, isEmpty);
     });
   });
 }
