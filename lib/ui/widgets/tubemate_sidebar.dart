@@ -110,7 +110,7 @@ class TubemateSidebar extends StatelessWidget {
                 color: TColors.line,
               ),
               const SizedBox(height: 18),
-              const _Logo(),
+              _Logo(),
               const SizedBox(height: 24),
               _NavItem(
                 icon: Icons.home_outlined,

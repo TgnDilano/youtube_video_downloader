@@ -420,7 +420,7 @@ class _SchemeTile extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _SchemeDot(color: scheme.main),
+            _SchemeDot(color: scheme.main, border: true),
             const SizedBox(width: 4),
             _SchemeDot(color: scheme.primary),
             const SizedBox(width: 4),
@@ -444,15 +444,25 @@ class _SchemeTile extends StatelessWidget {
 
 class _SchemeDot extends StatelessWidget {
   final Color color;
+  final bool border;
 
-  const _SchemeDot({required this.color});
+  const _SchemeDot({required this.color, this.border = false});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 14,
       height: 14,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: border
+            ? Border.all(
+                color: Color.lerp(TColors.textDim, TColors.text, 0.4)!,
+                width: 1,
+              )
+            : null,
+      ),
     );
   }
 }

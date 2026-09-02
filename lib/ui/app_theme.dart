@@ -33,53 +33,53 @@ class TColorScheme {
   }
 }
 
-/// The default dark structural base shared by all preset schemes; the custom
-/// picker can replace it.
+/// The default dark structural base used before a load/scheme applies and as
+/// the starting value of the custom color picker.
 const Color kDefaultMain = Color(0xFF14120F);
 
 /// Available color schemes: `main` drives the structural neutrals, `primary`
-/// the amber accents and `secondary` the green ones. The first entry is the
-/// app's original palette.
+/// the amber accents and `secondary` the green ones. Every preset carries its
+/// own `main`, so picking a scheme also changes the app's background.
 const List<TColorScheme> kColorSchemes = [
   TColorScheme(
     id: 'amber',
     label: 'Amber / Grass',
-    main: kDefaultMain,
+    main: Color(0xFF14120F),
     primary: Color(0xFFFF8A3D),
     secondary: Color(0xFF7FD858),
   ),
   TColorScheme(
     id: 'ember',
     label: 'Ember / Ice',
-    main: kDefaultMain,
+    main: Color(0xFF170F13),
     primary: Color(0xFFEF5350),
     secondary: Color(0xFF4DD0E1),
   ),
   TColorScheme(
     id: 'violet',
     label: 'Violet / Gold',
-    main: kDefaultMain,
+    main: Color(0xFF14101E),
     primary: Color(0xFFB388FF),
     secondary: Color(0xFFFFCB6B),
   ),
   TColorScheme(
     id: 'cyan',
     label: 'Cyan / Magenta',
-    main: kDefaultMain,
+    main: Color(0xFF0E1416),
     primary: Color(0xFF26A5DA),
     secondary: Color(0xFFEC4E7A),
   ),
   TColorScheme(
     id: 'lime',
     label: 'Lime / Teal',
-    main: kDefaultMain,
+    main: Color(0xFF12160F),
     primary: Color(0xFFCDDC39),
     secondary: Color(0xFF26A69A),
   ),
   TColorScheme(
     id: 'crimson',
     label: 'Crimson / Emerald',
-    main: kDefaultMain,
+    main: Color(0xFF1A1111),
     primary: Color(0xFFE53935),
     secondary: Color(0xFF43A047),
   ),
