@@ -27,6 +27,9 @@ import 'package:ytdlapp/features/schedule/ui/schedule_dialog.dart';
 import 'package:ytdlapp/features/download/ui/terminal_view.dart';
 import 'package:ytdlapp/core/widgets/tubemate_controls.dart';
 import 'package:ytdlapp/core/widgets/tubemate_sidebar.dart';
+import 'package:ytdlapp/features/torrents/data/torrent_engine.dart';
+import 'package:ytdlapp/features/torrents/domain/torrent_controller.dart';
+import 'package:ytdlapp/features/torrents/ui/torrents_page.dart';
 
 class TubemateClone extends StatefulWidget {
   const TubemateClone({super.key});
@@ -41,6 +44,8 @@ class _TubemateCloneState extends State<TubemateClone>
   final ConvertController _convertController = ConvertController();
   final SettingsController _settings = SettingsController();
   final ScheduleController _scheduleController = ScheduleController();
+  final TorrentController _torrentController =
+      TorrentController(engine: TorrentEngine());
   final ClipboardWatcher _clipboardWatcher = ClipboardWatcher();
   final TextEditingController _urlController = TextEditingController();
   final FocusNode _urlFocusNode = FocusNode();
@@ -75,6 +80,10 @@ class _TubemateCloneState extends State<TubemateClone>
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _urlFocusNode.requestFocus(),
     );
+
+    // Start the libtorrent session in the background; the controller/list
+    // populate once the engine reports torrent state updates.
+    _torrentController.engine.initialize().catchError((_) {});
 
     _settings.addListener(() {
       if (mounted) {
@@ -397,7 +406,12 @@ class _TubemateCloneState extends State<TubemateClone>
                       ? _buildHome()
                       : _selectedIndex == 1
                           ? ConvertPage(controller: _convertController)
-                          : SettingsPage(settings: _settings, controller: _controller),
+                          : _selectedIndex == 2
+                              ? SettingsPage(
+                                  settings: _settings,
+                                  controller: _controller,
+                                )
+                              : TorrentsPage(controller: _torrentController),
                 ),
               ),
             ),

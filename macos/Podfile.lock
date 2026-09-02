@@ -1,15 +1,21 @@
 PODS:
   - FlutterMacOS (1.0.0)
+  - libtorrent_flutter (1.7.0):
+    - FlutterMacOS
 
 DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
+  - libtorrent_flutter (from `Flutter/ephemeral/.symlinks/plugins/libtorrent_flutter/macos`)
 
 EXTERNAL SOURCES:
   FlutterMacOS:
     :path: Flutter/ephemeral
+  libtorrent_flutter:
+    :path: Flutter/ephemeral/.symlinks/plugins/libtorrent_flutter/macos
 
 SPEC CHECKSUMS:
   FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
+  libtorrent_flutter: 99fd80b6fc406686437d1bf8ebd77239ed99d0df
 
 PODFILE CHECKSUM: 1e95c36afbfd1cb6423ceca4de7a8e1b256fb6ac
 

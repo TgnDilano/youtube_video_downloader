@@ -41,6 +41,7 @@ dependencies:
   google_fonts: ^8.2.1
   window_manager: ^0.5.2
   path: ^1.9.0
+  libtorrent_flutter: ^2.0.0
 
 dev_dependencies:
   flutter_test:
