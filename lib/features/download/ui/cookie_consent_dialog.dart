@@ -83,7 +83,8 @@ class CookieConsentDialog extends StatelessWidget {
                   _ConsentLine(
                     icon: Icons.manage_search,
                     color: TColors.amber,
-                    text: 'What is read: ONLY YouTube cookies from $browser.\n'
+                    text:
+                        'What is read: ONLY YouTube cookies from $browser.\n'
                         'NOT passwords. NOT autofill. NOT history.',
                   ),
                   const SizedBox(height: 10),

@@ -2,7 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:ytdlapp/core/theme/app_theme.dart';
 import 'package:ytdlapp/features/schedule/domain/schedule_utils.dart';
 
-const List<String> _weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const List<String> _weekdays = [
+  'MON',
+  'TUE',
+  'WED',
+  'THU',
+  'FRI',
+  'SAT',
+  'SUN',
+];
 
 String _two(int v) => v.toString().padLeft(2, '0');
 
@@ -293,8 +301,11 @@ class _WhenChip extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               label,
-              style: TText.mono(context, size: 12, color: TColors.text)
-                  .copyWith(fontWeight: FontWeight.w600),
+              style: TText.mono(
+                context,
+                size: 12,
+                color: TColors.text,
+              ).copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(width: 4),
             const Icon(Icons.arrow_drop_down, size: 13, color: TColors.textDim),

@@ -61,7 +61,11 @@ class _TorrentDetailsDialog extends StatelessWidget {
                       color: TColors.jackBg,
                       border: Border.all(color: TColors.line),
                     ),
-                    child: Icon(Icons.folder_open, size: 15, color: TColors.amber),
+                    child: Icon(
+                      Icons.folder_open,
+                      size: 15,
+                      color: TColors.amber,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -119,9 +123,12 @@ class _TorrentDetailsDialog extends StatelessWidget {
                       ],
                     ),
                     const Spacer(),
-                    _pill(context, knownFileCount == files.length
-                        ? 'SIZE'
-                        : 'SIZE · PARTIAL'),
+                    _pill(
+                      context,
+                      knownFileCount == files.length
+                          ? 'SIZE'
+                          : 'SIZE · PARTIAL',
+                    ),
                   ],
                 ),
               ),
@@ -133,8 +140,11 @@ class _TorrentDetailsDialog extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.hourglass_empty,
-                              size: 28, color: TColors.textDim),
+                          Icon(
+                            Icons.hourglass_empty,
+                            size: 28,
+                            color: TColors.textDim,
+                          ),
                           const SizedBox(height: 10),
                           Text(
                             'Waiting for torrent metadata…',
@@ -194,8 +204,7 @@ class _TorrentDetailsDialog extends StatelessWidget {
                                         weight: FontWeight.w500,
                                       ),
                                     ),
-                                    if (f.path.isNotEmpty &&
-                                        f.path != f.name)
+                                    if (f.path.isNotEmpty && f.path != f.name)
                                       Text(
                                         f.path,
                                         maxLines: 1,
@@ -214,8 +223,8 @@ class _TorrentDetailsDialog extends StatelessWidget {
                                 f.size > 0
                                     ? _format(f.size)
                                     : knownTotal != null && files.length == 1
-                                        ? _format(knownTotal)
-                                        : '—',
+                                    ? _format(knownTotal)
+                                    : '—',
                                 style: TText.mono(
                                   context,
                                   size: 11,
@@ -314,7 +323,8 @@ class _TorrentDetailsDialog extends StatelessWidget {
   String _subtitle(TorrentTask task, List<TorrentFileInfo> files, int? total) {
     final parts = <String>[
       task.status.name.toUpperCase(),
-      if (files.isNotEmpty) '${files.length} FILE${files.length == 1 ? '' : 'S'}',
+      if (files.isNotEmpty)
+        '${files.length} FILE${files.length == 1 ? '' : 'S'}',
     ];
     return parts.join(' · ');
   }
@@ -334,7 +344,12 @@ class _TorrentDetailsDialog extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TText.mono(context, size: 8.5, letterSpacing: 0.1, color: TColors.textDim),
+        style: TText.mono(
+          context,
+          size: 8.5,
+          letterSpacing: 0.1,
+          color: TColors.textDim,
+        ),
       ),
     );
   }

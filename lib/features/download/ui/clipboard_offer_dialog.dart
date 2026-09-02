@@ -262,9 +262,7 @@ class _OfferButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: outline ? TColors.jackBg : TColors.amber,
-          border: Border.all(
-            color: outline ? TColors.amberDim : TColors.amber,
-          ),
+          border: Border.all(color: outline ? TColors.amberDim : TColors.amber),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

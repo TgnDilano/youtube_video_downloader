@@ -27,9 +27,7 @@ class TubemateSwitch extends StatelessWidget {
         height: 21,
         decoration: BoxDecoration(
           color: value ? color.withValues(alpha: 0.08) : TColors.jackBg,
-          border: Border.all(
-            color: value ? color : TColors.line,
-          ),
+          border: Border.all(color: value ? color : TColors.line),
         ),
         child: AnimatedAlign(
           duration: const Duration(milliseconds: 150),
@@ -107,11 +105,7 @@ class MonoCheckbox extends StatelessWidget {
           const SizedBox(width: 9),
           Text(
             label.toUpperCase(),
-            style: TText.mono(
-              context,
-              size: 11,
-              color: TColors.textMuted,
-            ),
+            style: TText.mono(context, size: 11, color: TColors.textMuted),
           ),
         ],
       ),
@@ -124,7 +118,11 @@ class RecordButton extends StatefulWidget {
   final VoidCallback? onPressed;
   final String label;
 
-  const RecordButton({super.key, required this.onPressed, this.label = 'Download'});
+  const RecordButton({
+    super.key,
+    required this.onPressed,
+    this.label = 'Download',
+  });
 
   @override
   State<RecordButton> createState() => _RecordButtonState();
@@ -146,8 +144,8 @@ class _RecordButtonState extends State<RecordButton> {
           color: _hovered && widget.onPressed != null
               ? TColors.amberBright
               : widget.onPressed != null
-                  ? TColors.amber
-                  : TColors.jackBg,
+              ? TColors.amber
+              : TColors.jackBg,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

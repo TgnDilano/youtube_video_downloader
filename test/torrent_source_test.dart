@@ -8,10 +8,7 @@ void main() {
         'magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567',
       );
       expect(source.kind, TorrentSourceKind.magnet);
-      expect(
-        source.label,
-        'magnet:0123456789ABCDEF0123456789ABCDEF01234567',
-      );
+      expect(source.label, 'magnet:0123456789ABCDEF0123456789ABCDEF01234567');
     });
 
     test('magnet without a valid btih still shows a readable tail', () {

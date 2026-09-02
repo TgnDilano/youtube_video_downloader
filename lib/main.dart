@@ -1,12 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:ytdlapp/src/rust/frb_generated.dart';
 import 'package:ytdlapp/features/settings/domain/settings_controller.dart';
 import 'package:ytdlapp/core/theme/app_theme.dart';
 import 'package:ytdlapp/features/shell/ui/home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Initialize the flutter_rust_bridge runtime before any engine call.
+  await RustLib.init();
   await _initWindow();
   // Apply the saved color scheme to TColors before the first frame renders so
   // the app never flashes the default amber palette on startup.

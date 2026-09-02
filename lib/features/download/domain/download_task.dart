@@ -73,7 +73,8 @@ class DownloadTask extends ChangeNotifier {
     final savedStatus = json['status'];
     DownloadStatus status;
     if (savedStatus is String) {
-      status = DownloadStatus.values.asNameMap()[savedStatus] ??
+      status =
+          DownloadStatus.values.asNameMap()[savedStatus] ??
           DownloadStatus.queued;
     } else if (savedStatus is num) {
       // Legacy numeric index — maps to the pre-`paused` enum order.

@@ -101,10 +101,10 @@ class _ResolutionPickerState extends State<ResolutionPicker> {
   }
 
   List<String> _optionsFrom(List<int> heights) => [
-        'best',
-        ...heights.map((h) => h.toString()),
-        if (widget.showAudio) 'audio',
-      ];
+    'best',
+    ...heights.map((h) => h.toString()),
+    if (widget.showAudio) 'audio',
+  ];
 
   List<String> get _options => _optionsFrom(_heights);
 
@@ -150,8 +150,8 @@ class _ResolutionPickerState extends State<ResolutionPicker> {
                     Text(
                       (widget.itemIndex != null
                               ? 'ITEM ${widget.itemIndex!.toString().padLeft(2, '0')}'
-                              : 'CAPTURE')
-                          + (widget.duration.isNotEmpty
+                              : 'CAPTURE') +
+                          (widget.duration.isNotEmpty
                               ? ' · ${widget.duration}'
                               : ''),
                       style: TText.mono(
@@ -247,9 +247,9 @@ class _ResolutionPickerState extends State<ResolutionPicker> {
                         sizeLabel: _sizeByOption[value] ?? '',
                         selected: _selected == value,
                         onTap: () {
-                        setState(() => _selected = value);
-                        widget.onChanged(value);
-                      },
+                          setState(() => _selected = value);
+                          widget.onChanged(value);
+                        },
                       ),
                   ],
                 ),
@@ -366,7 +366,11 @@ class _DialogThumbnail extends StatelessWidget {
   final double width;
   final double height;
 
-  const _DialogThumbnail({required this.url, required this.width, required this.height});
+  const _DialogThumbnail({
+    required this.url,
+    required this.width,
+    required this.height,
+  });
 
   @override
   Widget build(BuildContext context) {

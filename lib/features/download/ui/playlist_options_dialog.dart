@@ -179,7 +179,11 @@ class _PlaylistOptionsDialogState extends State<PlaylistOptionsDialog> {
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
               child: Row(
                 children: [
-                  _DialogThumbnail(url: widget.thumbnailUrl, width: 64, height: 36),
+                  _DialogThumbnail(
+                    url: widget.thumbnailUrl,
+                    width: 64,
+                    height: 36,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -196,7 +200,8 @@ class _PlaylistOptionsDialogState extends State<PlaylistOptionsDialog> {
                     MonoCheckbox(
                       value: _fullPlaylist,
                       label: 'Full playlist',
-                      onTap: () => setState(() => _fullPlaylist = !_fullPlaylist),
+                      onTap: () =>
+                          setState(() => _fullPlaylist = !_fullPlaylist),
                     ),
                 ],
               ),
@@ -220,8 +225,10 @@ class _PlaylistOptionsDialogState extends State<PlaylistOptionsDialog> {
                         color: selected
                             ? TColors.amber.withValues(alpha: 0.04)
                             : Colors.transparent,
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 5,
+                        ),
                         child: Row(
                           children: [
                             CheckSquare(value: selected, size: 14),
@@ -385,8 +392,8 @@ class _PlaylistOptionsDialogState extends State<PlaylistOptionsDialog> {
                       _fullPlaylist
                           ? 'QUEUE ALL ${total.toString().padLeft(2, '0')} ITEMS'
                           : _selected.isNotEmpty
-                              ? 'QUEUE ${_selected.length.toString().padLeft(2, '0')} SELECTED'
-                              : 'SELECT ITEMS TO QUEUE',
+                          ? 'QUEUE ${_selected.length.toString().padLeft(2, '0')} SELECTED'
+                          : 'SELECT ITEMS TO QUEUE',
                       style: TText.mono(
                         context,
                         size: 10.5,
@@ -530,8 +537,7 @@ class _ResRow extends StatelessWidget {
                 ),
               ),
             ),
-            if (selected)
-              Icon(Icons.check, size: 13, color: TColors.amber),
+            if (selected) Icon(Icons.check, size: 13, color: TColors.amber),
           ],
         ),
       ),

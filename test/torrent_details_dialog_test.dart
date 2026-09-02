@@ -7,8 +7,9 @@ import 'package:ytdlapp/features/torrents/ui/widgets/torrent_details_dialog.dart
 
 Widget _harness(TorrentTask task, List<TorrentFileInfo> files) {
   return MaterialApp(
-    theme: buildTubemateTheme(TestWidgetsFlutterBinding.ensureInitialized()
-        .rootElement!),
+    theme: buildTubemateTheme(
+      TestWidgetsFlutterBinding.ensureInitialized().rootElement!,
+    ),
     home: Builder(
       builder: (context) => Scaffold(
         body: Center(
@@ -24,8 +25,9 @@ Widget _harness(TorrentTask task, List<TorrentFileInfo> files) {
 }
 
 void main() {
-  testWidgets('lists torrent files with their sizes and a total footer',
-      (tester) async {
+  testWidgets('lists torrent files with their sizes and a total footer', (
+    tester,
+  ) async {
     final task = TorrentTask(
       id: 1,
       name: 'ubuntu.iso',
@@ -60,8 +62,9 @@ void main() {
     expect(find.text('TOTAL'), findsOneWidget);
   });
 
-  testWidgets('shows a placeholder message when there is no metadata yet',
-      (tester) async {
+  testWidgets('shows a placeholder message when there is no metadata yet', (
+    tester,
+  ) async {
     final task = TorrentTask(id: 2, name: 'unknown');
     await tester.pumpWidget(_harness(task, const []));
     await tester.tap(find.text('open'));
@@ -72,11 +75,7 @@ void main() {
 
   testWidgets('shows a dash when individual file sizes are unknown but total '
       'is known for multiple files', (tester) async {
-    final task = TorrentTask(
-      id: 3,
-      name: 'bundle',
-      totalSize: 8 * 1024 * 1024,
-    );
+    final task = TorrentTask(id: 3, name: 'bundle', totalSize: 8 * 1024 * 1024);
     final files = [
       const TorrentFileInfo(index: 0, name: 'a.bin', path: 'a.bin', size: 0),
       const TorrentFileInfo(index: 1, name: 'b.bin', path: 'b.bin', size: 0),

@@ -162,16 +162,18 @@ class TText {
     double size = 30,
     FontWeight weight = FontWeight.w700,
     Color color = TColors.text,
-  }) =>
-      GoogleFonts.spaceGrotesk(fontSize: size, fontWeight: weight, color: color);
+  }) => GoogleFonts.spaceGrotesk(
+    fontSize: size,
+    fontWeight: weight,
+    color: color,
+  );
 
   static TextStyle body(
     BuildContext context, {
     double size = 13.5,
     FontWeight weight = FontWeight.w400,
     Color color = TColors.text,
-  }) =>
-      GoogleFonts.inter(fontSize: size, fontWeight: weight, color: color);
+  }) => GoogleFonts.inter(fontSize: size, fontWeight: weight, color: color);
 
   static TextStyle mono(
     BuildContext context, {
@@ -179,13 +181,12 @@ class TText {
     FontWeight weight = FontWeight.w400,
     Color color = TColors.text,
     double letterSpacing = 0.06,
-  }) =>
-      GoogleFonts.jetBrainsMono(
-        fontSize: size,
-        fontWeight: weight,
-        color: color,
-        letterSpacing: letterSpacing,
-      );
+  }) => GoogleFonts.jetBrainsMono(
+    fontSize: size,
+    fontWeight: weight,
+    color: color,
+    letterSpacing: letterSpacing,
+  );
 }
 
 /// Base text styles used across the app via ThemeData.

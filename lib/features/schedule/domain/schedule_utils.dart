@@ -1,7 +1,15 @@
 /// Shared date/time formatting helpers for the schedule feature.
 library;
 
-const List<String> _weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const List<String> _weekdays = [
+  'MON',
+  'TUE',
+  'WED',
+  'THU',
+  'FRI',
+  'SAT',
+  'SUN',
+];
 
 String _two(int v) => v.toString().padLeft(2, '0');
 

@@ -48,12 +48,7 @@ class InputArea extends StatelessWidget {
               ),
             ),
           ),
-          Divider(
-            height: 1,
-            color: TColors.lineSoft,
-            indent: 0,
-            endIndent: 0,
-          ),
+          Divider(height: 1, color: TColors.lineSoft, indent: 0, endIndent: 0),
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onSelectFolder,
@@ -64,11 +59,7 @@ class InputArea extends StatelessWidget {
               child: Text(
                 selectedPath ?? 'Not set — tap to choose',
                 overflow: TextOverflow.ellipsis,
-                style: TText.mono(
-                  context,
-                  size: 13.5,
-                  color: TColors.amber,
-                ),
+                style: TText.mono(context, size: 13.5, color: TColors.amber),
               ),
             ),
           ),

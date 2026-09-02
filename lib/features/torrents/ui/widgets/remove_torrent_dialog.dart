@@ -107,11 +107,7 @@ class _RemoveTorrentDialogState extends State<_RemoveTorrentDialog> {
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 6),
               child: Text(
                 'This removes the torrent from the active session.',
-                style: TText.body(
-                  context,
-                  size: 12,
-                  color: TColors.textMuted,
-                ),
+                style: TText.body(context, size: 12, color: TColors.textMuted),
               ),
             ),
             if (widget.fromFile)
@@ -135,10 +131,7 @@ class _RemoveTorrentDialogState extends State<_RemoveTorrentDialog> {
             ),
             Divider(height: 1, color: TColors.lineSoft),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 18,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               child: Row(
                 children: [
                   Expanded(
@@ -238,9 +231,7 @@ class _RemoveTorrentDialogState extends State<_RemoveTorrentDialog> {
       height: 15,
       decoration: BoxDecoration(
         color: value ? TColors.red : TColors.jackBg,
-        border: Border.all(
-          color: value ? TColors.red : TColors.line,
-        ),
+        border: Border.all(color: value ? TColors.red : TColors.line),
       ),
       child: value
           ? const Icon(Icons.check, size: 12, color: Color(0xFF14120F))

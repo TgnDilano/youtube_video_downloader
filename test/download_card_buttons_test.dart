@@ -23,8 +23,9 @@ void main() {
     );
   }
 
-  testWidgets('downloading task shows Pause + Cancel; tapping Pause pauses',
-      (tester) async {
+  testWidgets('downloading task shows Pause + Cancel; tapping Pause pauses', (
+    tester,
+  ) async {
     final controller = DownloadController();
     final task = DownloadTask(
       id: 't1',
@@ -48,8 +49,9 @@ void main() {
     expect(find.byTooltip('Resume'), findsOneWidget);
   });
 
-  testWidgets('paused task shows Resume + Cancel; tapping Resume restarts',
-      (tester) async {
+  testWidgets('paused task shows Resume + Cancel; tapping Resume restarts', (
+    tester,
+  ) async {
     final controller = DownloadController();
     final task = DownloadTask(
       id: 't2',

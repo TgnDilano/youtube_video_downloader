@@ -1,0 +1,18 @@
+[package]
+name = "rust_lib_ytdlapp"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "rust_lib_ytdlapp"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+anyhow = "1"
+flutter_rust_bridge = "=2.13.0"
+librqbit = { version = "=9.0.1" }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

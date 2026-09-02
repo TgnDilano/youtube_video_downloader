@@ -113,11 +113,7 @@ class _ConvertPageState extends State<ConvertPage> {
         const SizedBox(height: 18),
         Row(
           children: [
-            const Icon(
-              Icons.folder_outlined,
-              size: 13,
-              color: TColors.textDim,
-            ),
+            const Icon(Icons.folder_outlined, size: 13, color: TColors.textDim),
             const SizedBox(width: 8),
             Text(
               'SAVE LOCATION IS ASKED FOR EACH CONVERSION',
@@ -138,9 +134,9 @@ class _ConvertPageState extends State<ConvertPage> {
                 _sourcePath == null
                     ? 'SELECT A SOURCE FILE TO BEGIN'
                     : _selectedTarget == null
-                        ? 'PICK A TARGET FORMAT'
-                        : '$_sourceName → ${_selectedTarget!.toUpperCase()}'
-                            .toUpperCase(),
+                    ? 'PICK A TARGET FORMAT'
+                    : '$_sourceName → ${_selectedTarget!.toUpperCase()}'
+                          .toUpperCase(),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TText.mono(
@@ -164,7 +160,11 @@ class _ConvertPageState extends State<ConvertPage> {
                 return Center(
                   child: Text(
                     'NO CONVERSIONS IN THIS LANE',
-                    style: TText.mono(context, size: 11, color: TColors.textDim),
+                    style: TText.mono(
+                      context,
+                      size: 11,
+                      color: TColors.textDim,
+                    ),
                   ),
                 );
               }
@@ -209,10 +209,7 @@ class _ConvertPageState extends State<ConvertPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Convert',
-            style: TText.display(context, size: 30),
-          ),
+          Text('Convert', style: TText.display(context, size: 30)),
           const SizedBox(height: 6),
           Text(
             'Local files, new formats. Video to audio in one pass.',
@@ -462,10 +459,10 @@ class _TargetChipState extends State<_TargetChip> {
   Widget build(BuildContext context) {
     final finalColor = widget.enabled
         ? widget.selected
-            ? TColors.amber
-            : _hovered
-                ? TColors.amber
-                : TColors.textMuted
+              ? TColors.amber
+              : _hovered
+              ? TColors.amber
+              : TColors.textMuted
         : TColors.textDim;
     return MouseRegion(
       cursor: widget.enabled
@@ -590,10 +587,7 @@ class _ConvertCardState extends State<ConvertCard>
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             child: Row(
               children: [
-                _StatusGlyph(
-                  task: task,
-                  spin: _spinController,
-                ),
+                _StatusGlyph(task: task, spin: _spinController),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -684,16 +678,25 @@ class _StatusGlyph extends StatelessWidget {
       ConvertStatus.converting => TColors.amber,
     };
     final child = switch (task.status) {
-      ConvertStatus.completed =>
-        Icon(Icons.check, size: size * 0.4, color: TColors.green),
-      ConvertStatus.error =>
-        Icon(Icons.close, size: size * 0.4, color: TColors.red),
-      ConvertStatus.queued =>
-        Icon(Icons.hourglass_empty, size: size * 0.45, color: color),
+      ConvertStatus.completed => Icon(
+        Icons.check,
+        size: size * 0.4,
+        color: TColors.green,
+      ),
+      ConvertStatus.error => Icon(
+        Icons.close,
+        size: size * 0.4,
+        color: TColors.red,
+      ),
+      ConvertStatus.queued => Icon(
+        Icons.hourglass_empty,
+        size: size * 0.45,
+        color: color,
+      ),
       ConvertStatus.converting => RotationTransition(
-          turns: spin,
-          child: Icon(Icons.sync, size: size * 0.45, color: color),
-        ),
+        turns: spin,
+        child: Icon(Icons.sync, size: size * 0.45, color: color),
+      ),
     };
     return Container(
       width: size,

@@ -27,17 +27,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Convert button is inert until a source is selected',
-      (tester) async {
+  testWidgets('Convert button is inert until a source is selected', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: ConvertPage(controller: ConvertController()),
-        ),
+        home: Scaffold(body: ConvertPage(controller: ConvertController())),
       ),
     );
     await tester.pump();

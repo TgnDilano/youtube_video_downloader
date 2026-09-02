@@ -232,11 +232,7 @@ class _DotState extends State<_Dot> {
               ],
             ),
             child: _hovered
-                ? Icon(
-                    widget.icon,
-                    size: 7,
-                    color: const Color(0x66000000),
-                  )
+                ? Icon(widget.icon, size: 7, color: const Color(0x66000000))
                 : null,
           ),
         ),

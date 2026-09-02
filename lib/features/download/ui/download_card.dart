@@ -80,9 +80,7 @@ class _DownloadCardState extends State<DownloadCard>
               border: Border.all(color: TColors.line),
             ),
             child: Theme(
-              data: Theme.of(context).copyWith(
-                dividerColor: TColors.lineSoft,
-              ),
+              data: Theme.of(context).copyWith(dividerColor: TColors.lineSoft),
               child: ExpansionTile(
                 initiallyExpanded: true,
                 tilePadding: const EdgeInsets.symmetric(horizontal: 18),
@@ -182,8 +180,8 @@ class _DownloadCardState extends State<DownloadCard>
     final res = task.audioOnly
         ? 'Audio'
         : task.resolution == 'best'
-            ? 'Best'
-            : '${task.resolution}p';
+        ? 'Best'
+        : '${task.resolution}p';
     final fmt = task.audioOnly ? 'MP3' : 'MP4';
     final pct = switch (task.status) {
       DownloadStatus.completed => 'Done',
@@ -217,34 +215,28 @@ class _DownloadCardState extends State<DownloadCard>
   Widget _buildActions(BuildContext context) {
     final (icon, onTap, tooltip, color) = switch (task.status) {
       DownloadStatus.completed => (
-          Icons.folder_open,
-          () => _openFolder(task.savePath),
-          'Open folder',
-          TColors.textMuted,
-        ),
+        Icons.folder_open,
+        () => _openFolder(task.savePath),
+        'Open folder',
+        TColors.textMuted,
+      ),
       DownloadStatus.error => (
-          Icons.refresh,
-          widget.onRetry,
-          'Retry',
-          TColors.amber,
-        ),
+        Icons.refresh,
+        widget.onRetry,
+        'Retry',
+        TColors.amber,
+      ),
       DownloadStatus.paused => (
-          Icons.close,
-          widget.onRemove,
-          'Remove',
-          TColors.red,
-        ),
-      _ => (
-          Icons.close,
-          widget.onRemove,
-          'Cancel',
-          TColors.red,
-        ),
+        Icons.close,
+        widget.onRemove,
+        'Remove',
+        TColors.red,
+      ),
+      _ => (Icons.close, widget.onRemove, 'Cancel', TColors.red),
     };
 
     final actions = <Widget>[
-      if (task.status == DownloadStatus.downloading &&
-          widget.onPause != null)
+      if (task.status == DownloadStatus.downloading && widget.onPause != null)
         _ActionButton(
           icon: Icons.pause,
           color: TColors.amber,
@@ -258,12 +250,7 @@ class _DownloadCardState extends State<DownloadCard>
           tooltip: 'Resume',
           onTap: widget.onResume,
         ),
-      _ActionButton(
-        icon: icon,
-        color: color,
-        tooltip: tooltip,
-        onTap: onTap,
-      ),
+      _ActionButton(icon: icon, color: color, tooltip: tooltip, onTap: onTap),
     ];
     if (task.status == DownloadStatus.completed) {
       actions.insert(
@@ -276,10 +263,7 @@ class _DownloadCardState extends State<DownloadCard>
         ),
       );
     }
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: actions,
-    );
+    return Row(mainAxisSize: MainAxisSize.min, children: actions);
   }
 
   Future<void> _openFolder(String? path) async {
@@ -329,19 +313,29 @@ class _StatusIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final child = switch (task.status) {
-      DownloadStatus.completed =>
-        Icon(Icons.check, size: size * 0.45, color: TColors.green),
-      DownloadStatus.error =>
-        Icon(Icons.close, size: size * 0.45, color: TColors.red),
-      DownloadStatus.paused =>
-        Icon(Icons.pause, size: size * 0.45, color: TColors.textMuted),
+      DownloadStatus.completed => Icon(
+        Icons.check,
+        size: size * 0.45,
+        color: TColors.green,
+      ),
+      DownloadStatus.error => Icon(
+        Icons.close,
+        size: size * 0.45,
+        color: TColors.red,
+      ),
+      DownloadStatus.paused => Icon(
+        Icons.pause,
+        size: size * 0.45,
+        color: TColors.textMuted,
+      ),
       DownloadStatus.queued => _Reel(radius: size / 2, color: TColors.textDim),
       DownloadStatus.downloading => RotationTransition(
-          turns: spin,
-          child: _Reel(radius: size / 2, color: TColors.amber),
-        ),
+        turns: spin,
+        child: _Reel(radius: size / 2, color: TColors.amber),
+      ),
     };
-    final isReel = task.status == DownloadStatus.downloading ||
+    final isReel =
+        task.status == DownloadStatus.downloading ||
         task.status == DownloadStatus.queued;
     return SizedBox(
       width: size,
@@ -402,16 +396,8 @@ class _ReelPainter extends CustomPainter {
 
     final dot = Paint()..color = color;
     const dotR = 2.0;
-    canvas.drawCircle(
-      Offset(center.dx, center.dy - radius + 4),
-      dotR,
-      dot,
-    );
-    canvas.drawCircle(
-      Offset(center.dx, center.dy + radius - 4),
-      dotR,
-      dot,
-    );
+    canvas.drawCircle(Offset(center.dx, center.dy - radius + 4), dotR, dot);
+    canvas.drawCircle(Offset(center.dx, center.dy + radius - 4), dotR, dot);
   }
 
   @override

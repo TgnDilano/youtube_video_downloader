@@ -35,8 +35,9 @@ class TorrentController extends ChangeNotifier {
   }
 
   /// Adds a torrent; [savePath] must be provided (always-prompt policy).
-  int addTorrent(TorrentSource source, String savePath) {
-    final id = engine.add(source, savePath);
+  /// Returns the new torrent id after the native engine has accepted it.
+  Future<int> addTorrent(TorrentSource source, String savePath) async {
+    final id = await engine.add(source, savePath);
     _tasks[id] = TorrentTask(id: id, savePath: savePath, source: source);
     notifyListeners();
     return id;
@@ -109,10 +110,8 @@ class TorrentController extends ChangeNotifier {
     }
   }
 
-  TorrentTask _fromEngine(TorrentEngineSnapshot info) => _apply(
-        TorrentTask(id: info.id, savePath: info.savePath),
-        info,
-      );
+  TorrentTask _fromEngine(TorrentEngineSnapshot info) =>
+      _apply(TorrentTask(id: info.id, savePath: info.savePath), info);
 
   TorrentTask _apply(TorrentTask task, TorrentEngineSnapshot info) {
     task.name = info.name;

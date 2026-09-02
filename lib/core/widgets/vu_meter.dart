@@ -26,8 +26,8 @@ class VuMeter extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: i < filled
                       ? (i < (barCount * 0.6).round()
-                          ? TColors.green
-                          : TColors.amber)
+                            ? TColors.green
+                            : TColors.amber)
                       : TColors.line,
                   borderRadius: BorderRadius.circular(1),
                 ),

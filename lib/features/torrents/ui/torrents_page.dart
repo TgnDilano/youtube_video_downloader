@@ -100,7 +100,7 @@ class _TorrentsPageState extends State<TorrentsPage> {
       );
       return;
     }
-    final id = widget.controller.addTorrent(source, savePath);
+    final id = await widget.controller.addTorrent(source, savePath);
     if (source.kind == TorrentSourceKind.file) {
       // A .torrent file already carries metadata, so we can show its contents
       // immediately instead of waiting until the download finishes.
@@ -132,11 +132,7 @@ class _TorrentsPageState extends State<TorrentsPage> {
     // Pull the current file list from the engine so the dialog always shows
     // fresh content (size may be unknown until metadata arrives).
     final files = widget.controller.files(task.id);
-    await showTorrentDetailsDialog(
-      context,
-      task: task,
-      files: files,
-    );
+    await showTorrentDetailsDialog(context, task: task, files: files);
     setState(() {});
   }
 
@@ -170,17 +166,11 @@ class _TorrentsPageState extends State<TorrentsPage> {
     );
   }
 
-  Widget _buildHeader(
-    BuildContext context,
-    List<TorrentTask> tasks,
-  ) {
+  Widget _buildHeader(BuildContext context, List<TorrentTask> tasks) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(
-          'Torrents',
-          style: TText.display(context, size: 30),
-        ),
+        Text('Torrents', style: TText.display(context, size: 30)),
         const SizedBox(width: 12),
         Padding(
           padding: const EdgeInsets.only(bottom: 4),
@@ -222,11 +212,7 @@ class _TorrentsPageState extends State<TorrentsPage> {
                     controller: _magnetController,
                     onSubmitted: (_) =>
                         _sourceFromMagnet(_magnetController.text),
-                    style: TText.mono(
-                      context,
-                      size: 13,
-                      color: TColors.text,
-                    ),
+                    style: TText.mono(context, size: 13, color: TColors.text),
                     cursorColor: TColors.amber,
                     decoration: const InputDecoration(
                       isCollapsed: true,
@@ -243,8 +229,12 @@ class _TorrentsPageState extends State<TorrentsPage> {
                     style: TText.mono(context, size: 12, color: TColors.green),
                   ),
                 const SizedBox(width: 8),
-                _chip(context, Icons.description_outlined, 'FROM FILE',
-                    onTap: _pickFile),
+                _chip(
+                  context,
+                  Icons.description_outlined,
+                  'FROM FILE',
+                  onTap: _pickFile,
+                ),
               ],
             ),
           ),
@@ -359,8 +349,12 @@ class _TorrentsPageState extends State<TorrentsPage> {
     );
   }
 
-  Widget _chip(BuildContext context, IconData icon, String label,
-      {required VoidCallback onTap}) {
+  Widget _chip(
+    BuildContext context,
+    IconData icon,
+    String label, {
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Row(

@@ -52,8 +52,7 @@ class DownloadController extends ChangeNotifier {
   /// Last `ERROR:` line captured from the yt-dlp output, cleaned up for
   /// display. Empty string when nothing useful was captured.
   static String _lastOutputError(DownloadTask task) {
-    final lines =
-        task.liveOutput.split('\n').where((l) => l.trim().isNotEmpty);
+    final lines = task.liveOutput.split('\n').where((l) => l.trim().isNotEmpty);
     for (final line in lines.toList().reversed) {
       if (line.contains('ERROR:') && !line.contains('WARNING:')) {
         return line.trim();
@@ -68,9 +67,7 @@ class DownloadController extends ChangeNotifier {
   /// empty string when no browser should be passed.
   static String resolveCookieBrowser(String setting) {
     if (setting == 'none') return '';
-    final candidates = setting == 'auto'
-        ? _browserPreferenceOrder
-        : [setting];
+    final candidates = setting == 'auto' ? _browserPreferenceOrder : [setting];
     for (final browser in candidates) {
       if (_browserProfileExists(browser)) return browser;
     }
@@ -99,9 +96,7 @@ class DownloadController extends ChangeNotifier {
       switch (browser) {
         case 'chrome':
           return local != null &&
-              Directory(
-                '$local\\Google\\Chrome\\User Data',
-              ).existsSync();
+              Directory('$local\\Google\\Chrome\\User Data').existsSync();
         case 'edge':
           return local != null &&
               Directory('$local\\Microsoft\\Edge\\User Data').existsSync();
@@ -143,9 +138,7 @@ class DownloadController extends ChangeNotifier {
   /// encryption (needs explicit user consent on macOS only).
   static bool _isKeychainBrowser(String browser) {
     if (!Platform.isMacOS) return false;
-    return browser == 'chrome' ||
-        browser == 'edge' ||
-        browser == 'brave';
+    return browser == 'chrome' || browser == 'edge' || browser == 'brave';
   }
 
   /// Builds the auth flag pair for the FIRST attempt of a download.
@@ -165,8 +158,9 @@ class DownloadController extends ChangeNotifier {
       return ['--cookies', cookiesFile];
     }
 
-    final browser =
-        resolveCookieBrowser(prefs.getString('cookie_browser') ?? 'auto');
+    final browser = resolveCookieBrowser(
+      prefs.getString('cookie_browser') ?? 'auto',
+    );
     if (browser.isEmpty) return const [];
     if (_isKeychainBrowser(browser) && !_cookieConsentGranted) return const [];
 
@@ -187,8 +181,9 @@ class DownloadController extends ChangeNotifier {
       return const [];
     }
 
-    final browser =
-        resolveCookieBrowser(prefs.getString('cookie_browser') ?? 'auto');
+    final browser = resolveCookieBrowser(
+      prefs.getString('cookie_browser') ?? 'auto',
+    );
     if (!_isKeychainBrowser(browser)) return const [];
     if (_cookieConsentGranted) return ['--cookies-from-browser', browser];
     if (_cookieConsentPrompted) return const [];
@@ -301,7 +296,8 @@ class DownloadController extends ChangeNotifier {
         task.title = metadata['title'] ?? "Unknown Title";
         task.thumbnail = metadata['thumbnail'] ?? "";
         task.metadata = "YouTube • ${metadata['duration_string'] ?? 'Unknown'}";
-        final size = estimateSizeForResolution(
+        final size =
+            estimateSizeForResolution(
               metadata,
               audioOnly ? 'audio' : resolution,
             ) ??
@@ -393,8 +389,7 @@ class DownloadController extends ChangeNotifier {
               } else {
                 streamIndex++;
                 final listIndex = data['playlist_index'] ?? streamIndex;
-                final itemRes =
-                    itemResolutions?['$listIndex'] ?? resolution;
+                final itemRes = itemResolutions?['$listIndex'] ?? resolution;
                 final childTask = DownloadTask(
                   id: data['id'] ?? DateTime.now().toString(),
                   url: data['url'] ?? data['webpage_url'] ?? url,
@@ -534,8 +529,8 @@ class DownloadController extends ChangeNotifier {
         task.title = data['title'] ?? "Unknown Title";
         task.thumbnail = data['thumbnail'] ?? "";
         task.metadata = "YouTube • ${data['duration_string'] ?? 'Unknown'}";
-        final size = estimateSizeForResolution(data, 'best') ??
-            _estimateFileSize(data);
+        final size =
+            estimateSizeForResolution(data, 'best') ?? _estimateFileSize(data);
         task.fileSize = formatBytes(size);
       } else {
         task.title = "Video info unavailable";
@@ -756,7 +751,7 @@ class DownloadController extends ChangeNotifier {
       task.url,
     ]);
 
-log.add(
+    log.add(
       '--- Starting Download: ${task.title} (Res: ${task.resolution}) ---',
     );
     if (cookieArgs.isEmpty) {
@@ -895,7 +890,8 @@ log.add(
         return true;
       } else {
         final reason = _lastOutputError(task);
-        final looksLike403 = reason.contains('403') ||
+        final looksLike403 =
+            reason.contains('403') ||
             task.liveOutput.contains('HTTP Error 403') ||
             task.liveOutput.contains('rate limit') ||
             task.liveOutput.contains('Sign in to confirm');
@@ -903,8 +899,10 @@ log.add(
             !playerFallback &&
             !keychainFallback &&
             _isYouTubeUrl(task.url)) {
-          log.add('--- HTTP 403 or bot-check detected — retrying with '
-              'alternate player client (no login) ---');
+          log.add(
+            '--- HTTP 403 or bot-check detected — retrying with '
+            'alternate player client (no login) ---',
+          );
           task.liveOutput = '';
           task.progress = 0.0;
           task.update();
@@ -923,8 +921,10 @@ log.add(
           if (keychainArgs.isEmpty) {
             log.add('(no browser login available — giving up)');
           } else {
-            log.add('--- Still 403 — retrying with browser cookies '
-                '(consent-granted) ---');
+            log.add(
+              '--- Still 403 — retrying with browser cookies '
+              '(consent-granted) ---',
+            );
             task.liveOutput = '';
             task.progress = 0.0;
             task.update();
@@ -980,9 +980,7 @@ log.add(
       _killProcess(task.process);
       task.status = DownloadStatus.paused;
       final pct = (task.progress * 100).clamp(0, 100).round();
-      task.metadata = task.progress > 0
-          ? 'Paused • $pct%'
-          : 'Paused';
+      task.metadata = task.progress > 0 ? 'Paused • $pct%' : 'Paused';
     }
     task.update();
     saveHistory();

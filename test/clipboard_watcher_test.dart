@@ -31,15 +31,11 @@ void main() {
         isTrue,
       );
       expect(
-        ClipboardWatcher.isYouTubeUrl(
-          'https://music.youtube.com/watch?v=xYz',
-        ),
+        ClipboardWatcher.isYouTubeUrl('https://music.youtube.com/watch?v=xYz'),
         isTrue,
       );
       expect(
-        ClipboardWatcher.isYouTubeUrl(
-          'https://www.youtube.com/embed/xYz',
-        ),
+        ClipboardWatcher.isYouTubeUrl('https://www.youtube.com/embed/xYz'),
         isTrue,
       );
     });
@@ -56,14 +52,11 @@ void main() {
     test('rejects empty, feed URLs and other domains', () {
       expect(ClipboardWatcher.isYouTubeUrl(''), isFalse);
       expect(ClipboardWatcher.isYouTubeUrl('   '), isFalse);
-      expect(ClipboardWatcher.isYouTubeUrl('https://example.com/watch?v=x'),
-          isFalse);
       expect(
-        ClipboardWatcher.isYouTubeUrl(
-          'https://www.youtube.com',
-        ),
+        ClipboardWatcher.isYouTubeUrl('https://example.com/watch?v=x'),
         isFalse,
       );
+      expect(ClipboardWatcher.isYouTubeUrl('https://www.youtube.com'), isFalse);
     });
 
     test('starts and stops the polling timer', () async {

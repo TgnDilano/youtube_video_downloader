@@ -50,11 +50,7 @@ class TorrentCard extends StatelessWidget {
                 child: Text(
                   task.name,
                   overflow: TextOverflow.ellipsis,
-                  style: TText.body(
-                    context,
-                    size: 14,
-                    weight: FontWeight.w600,
-                  ),
+                  style: TText.body(context, size: 14, weight: FontWeight.w600),
                 ),
               ),
               _label(context, task.status.name.toUpperCase(), statusColor),
@@ -78,9 +74,7 @@ class TorrentCard extends StatelessWidget {
               _metric(
                 context,
                 _bytes(task.totalDone),
-                task.totalSize > 0
-                    ? 'OF ${_bytes(task.totalSize)}'
-                    : 'SIZE …',
+                task.totalSize > 0 ? 'OF ${_bytes(task.totalSize)}' : 'SIZE …',
               ),
               if (task.eta.isNotEmpty) ...[
                 const SizedBox(width: 16),
@@ -109,11 +103,21 @@ class TorrentCard extends StatelessWidget {
               else
                 _action(context, Icons.pause, 'PAUSE', onPause),
               const SizedBox(width: 16),
-              _action(context, Icons.info_outline, 'DETAILS', onDetails,
-                  dim: true),
+              _action(
+                context,
+                Icons.info_outline,
+                'DETAILS',
+                onDetails,
+                dim: true,
+              ),
               const Spacer(),
-              _action(context, Icons.delete_outline, 'REMOVE', onRemove,
-                  danger: true),
+              _action(
+                context,
+                Icons.delete_outline,
+                'REMOVE',
+                onRemove,
+                danger: true,
+              ),
             ],
           ),
         ],
@@ -128,10 +132,7 @@ class TorrentCard extends StatelessWidget {
         color: color.withValues(alpha: 0.15),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
-      child: Text(
-        text,
-        style: TText.mono(context, size: 9.5, color: color),
-      ),
+      child: Text(text, style: TText.mono(context, size: 9.5, color: color)),
     );
   }
 
@@ -162,18 +163,15 @@ class TorrentCard extends StatelessWidget {
     final color = danger
         ? TColors.red
         : dim
-            ? TColors.textMuted
-            : TColors.amber;
+        ? TColors.textMuted
+        : TColors.amber;
     return GestureDetector(
       onTap: onTap,
       child: Row(
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TText.mono(context, size: 10.5, color: color),
-          ),
+          Text(label, style: TText.mono(context, size: 10.5, color: color)),
         ],
       ),
     );

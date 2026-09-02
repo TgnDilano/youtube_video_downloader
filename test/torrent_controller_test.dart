@@ -11,11 +11,10 @@ class _FakeEngine extends TorrentEngine {
   final Map<int, TorrentEngineSnapshot> injected = {};
 
   @override
-  Map<int, TorrentEngineSnapshot> get snapshots =>
-      Map.unmodifiable(injected);
+  Map<int, TorrentEngineSnapshot> get snapshots => Map.unmodifiable(injected);
 
   @override
-  int add(TorrentSource source, String savePath) => 1;
+  Future<int> add(TorrentSource source, String savePath) async => 1;
 
   @override
   void pause(int id) => paused.add(id);
@@ -24,17 +23,18 @@ class _FakeEngine extends TorrentEngine {
   void resume(int id) => resumed.add(id);
 
   @override
-  void remove(int id, {bool deleteFiles = false}) =>
-      removed[id] = deleteFiles;
+  void remove(int id, {bool deleteFiles = false}) => removed[id] = deleteFiles;
 }
 
 void main() {
   group('TorrentController pause/resume', () {
-    test('pause flips task state immediately so the UI icon changes', () {
+    test('pause flips task state immediately so the UI icon changes', () async {
       final engine = _FakeEngine();
       final controller = TorrentController(engine: engine);
-      final id = controller.addTorrent(
-        TorrentSource.magnet('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567'),
+      final id = await controller.addTorrent(
+        TorrentSource.magnet(
+          'magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567',
+        ),
         '/tmp',
       );
       final task = controller.tasks.first;
@@ -49,19 +49,30 @@ void main() {
       expect(engine.paused, contains(id));
       expect(task.isPaused, isTrue);
       expect(task.status, TorrentStatus.paused);
-      expect(task.downloadRate, '0 B/s',
-          reason: 'stale download speed must clear on pause');
-      expect(task.uploadRate, '0 B/s',
-          reason: 'stale upload speed must clear on pause');
-      expect(notified, greaterThan(0),
-          reason: 'UI must rebuild right away on pause');
+      expect(
+        task.downloadRate,
+        '0 B/s',
+        reason: 'stale download speed must clear on pause',
+      );
+      expect(
+        task.uploadRate,
+        '0 B/s',
+        reason: 'stale upload speed must clear on pause',
+      );
+      expect(
+        notified,
+        greaterThan(0),
+        reason: 'UI must rebuild right away on pause',
+      );
     });
 
-    test('resume flips task state back to downloading immediately', () {
+    test('resume flips task state back to downloading immediately', () async {
       final engine = _FakeEngine();
       final controller = TorrentController(engine: engine);
-      final id = controller.addTorrent(
-        TorrentSource.magnet('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567'),
+      final id = await controller.addTorrent(
+        TorrentSource.magnet(
+          'magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567',
+        ),
         '/tmp',
       );
       controller.pause(id);
@@ -74,26 +85,34 @@ void main() {
       expect(task.status, TorrentStatus.downloading);
     });
 
-    test('remove without delete options keeps data and default source file', () {
+    test(
+      'remove without delete options keeps data and default source file',
+      () async {
+        final engine = _FakeEngine();
+        final controller = TorrentController(engine: engine);
+        final id = await controller.addTorrent(
+          TorrentSource.file('/tmp/downloads/ubuntu.torrent'),
+          '/tmp',
+        );
+
+        controller.remove(id);
+
+        expect(
+          engine.removed[id],
+          isFalse,
+          reason: 'data files kept by default (deleteFiles=false)',
+        );
+        expect(controller.tasks, isEmpty);
+      },
+    );
+
+    test('remove with deleteData=true requests file deletion from engine', () async {
       final engine = _FakeEngine();
       final controller = TorrentController(engine: engine);
-      final id = controller.addTorrent(
-        TorrentSource.file('/tmp/downloads/ubuntu.torrent'),
-        '/tmp',
-      );
-
-      controller.remove(id);
-
-      expect(engine.removed[id], isFalse,
-          reason: 'data files kept by default (deleteFiles=false)');
-      expect(controller.tasks, isEmpty);
-    });
-
-    test('remove with deleteData=true requests file deletion from engine', () {
-      final engine = _FakeEngine();
-      final controller = TorrentController(engine: engine);
-      final id = controller.addTorrent(
-        TorrentSource.magnet('magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567'),
+      final id = await controller.addTorrent(
+        TorrentSource.magnet(
+          'magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567',
+        ),
         '/tmp',
       );
 
@@ -112,49 +131,50 @@ void main() {
       required int totalWanted,
       required int totalDone,
       required int downloadRate,
-    }) =>
-        TorrentEngineSnapshot(
-          id: id,
-          name: 'file',
-          savePath: '/tmp',
-          errorMsg: '',
-          status: paused
-              ? TorrentStatus.paused
-              : finished
-                  ? TorrentStatus.seeding
-                  : TorrentStatus.downloading,
-          progress: totalWanted == 0 ? 0 : totalDone / totalWanted,
-          downloadRate: downloadRate,
-          uploadRate: 0,
-          totalDone: totalDone,
-          totalWanted: totalWanted,
-          totalUploaded: 0,
-          numPeers: 0,
-          numSeeds: 0,
-          isPaused: paused,
-          isFinished: finished,
-          hasMetadata: totalWanted > 0,
+    }) => TorrentEngineSnapshot(
+      id: id,
+      name: 'file',
+      savePath: '/tmp',
+      errorMsg: '',
+      status: paused
+          ? TorrentStatus.paused
+          : finished
+          ? TorrentStatus.seeding
+          : TorrentStatus.downloading,
+      progress: totalWanted == 0 ? 0 : totalDone / totalWanted,
+      downloadRate: downloadRate,
+      uploadRate: 0,
+      totalDone: totalDone,
+      totalWanted: totalWanted,
+      totalUploaded: 0,
+      numPeers: 0,
+      numSeeds: 0,
+      isPaused: paused,
+      isFinished: finished,
+      hasMetadata: totalWanted > 0,
+    );
+
+    test(
+      'total size and ETA are computed from active download metrics',
+      () async {
+        final e = _FakeEngine();
+        final controller = TorrentController(engine: e);
+        e.injected[1] = snap(
+          id: 1,
+          paused: false,
+          finished: false,
+          totalWanted: 10 * 1024 * 1024,
+          totalDone: 5 * 1024 * 1024,
+          downloadRate: 1024 * 1024,
         );
+        e.tasksChanged?.call();
 
-    test('total size and ETA are computed from active download metrics',
-        () async {
-      final e = _FakeEngine();
-      final controller = TorrentController(engine: e);
-      e.injected[1] = snap(
-        id: 1,
-        paused: false,
-        finished: false,
-        totalWanted: 10 * 1024 * 1024,
-        totalDone: 5 * 1024 * 1024,
-        downloadRate: 1024 * 1024,
-      );
-      e.tasksChanged?.call();
-
-      final task = controller.tasks.first;
-      expect(task.totalSize, 10 * 1024 * 1024);
-      // remaining 5 MiB at 1 MiB/s → 5s
-      expect(task.eta, '5s');
-    });
+        final task = controller.tasks.first;
+        expect(task.totalSize, 10 * 1024 * 1024);
+        // remaining 5 MiB at 1 MiB/s → 5s
+        expect(task.eta, '5s');
+      },
+    );
 
     test('ETA is blank when paused or finished', () async {
       final e = _FakeEngine();

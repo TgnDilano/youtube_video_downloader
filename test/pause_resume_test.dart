@@ -10,9 +10,7 @@ import 'package:ytdlapp/features/download/domain/download_task.dart';
 // verifies yt-dlp resumes from the .part file.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  SharedPreferences.setMockInitialValues({
-    'cookie_browser': 'none',
-  });
+  SharedPreferences.setMockInitialValues({'cookie_browser': 'none'});
 
   late Directory workDir;
   late Process server;
@@ -24,7 +22,9 @@ void main() {
     );
     await workDir.create(recursive: true);
     final big = File('${workDir.path}/source.bin');
-    await big.writeAsBytes(List<int>.generate(24 * 1024 * 1024, (i) => i % 251));
+    await big.writeAsBytes(
+      List<int>.generate(24 * 1024 * 1024, (i) => i % 251),
+    );
 
     final serverScript = File('${workDir.path}/server.py');
     await serverScript.writeAsString('''
@@ -75,80 +75,81 @@ ThreadingHTTPServer(('127.0.0.1', 8788), H).serve_forever()
     } catch (_) {}
   });
 
-  test('pause kills the process and keeps the .part file; resume continues',
-      () async {
-    final controller = DownloadController();
-    controller.addDownload(
-      url,
-      workDir.path,
-      false,
-      metadata: {'title': 'big'},
-    );
+  test(
+    'pause kills the process and keeps the .part file; resume continues',
+    () async {
+      final controller = DownloadController();
+      controller.addDownload(
+        url,
+        workDir.path,
+        false,
+        metadata: {'title': 'big'},
+      );
 
-    final task = controller.tasks.first;
+      final task = controller.tasks.first;
 
-    // Wait until the download process is alive and has started writing data.
-    await _waitUntil(
-      () => task.status == DownloadStatus.downloading &&
-          task.process != null &&
-          task.process!.pid > 0,
-      timeout: const Duration(seconds: 20),
-    );
-    await _waitUntil(
-      () => Directory(workDir.path)
-          .listSync()
-          .any((f) => f.path.endsWith('.part') && f.statSync().size > 100000),
-      timeout: const Duration(seconds: 20),
-    );
+      // Wait until the download process is alive and has started writing data.
+      await _waitUntil(
+        () =>
+            task.status == DownloadStatus.downloading &&
+            task.process != null &&
+            task.process!.pid > 0,
+        timeout: const Duration(seconds: 20),
+      );
+      await _waitUntil(
+        () => Directory(workDir.path).listSync().any(
+          (f) => f.path.endsWith('.part') && f.statSync().size > 100000,
+        ),
+        timeout: const Duration(seconds: 20),
+      );
 
-    final partSizeBefore = Directory(workDir.path)
-        .listSync()
-        .firstWhere((f) => f.path.endsWith('.part'))
-        .statSync()
-        .size;
-    expect(partSizeBefore, greaterThan(100000));
+      final partSizeBefore = Directory(
+        workDir.path,
+      ).listSync().firstWhere((f) => f.path.endsWith('.part')).statSync().size;
+      expect(partSizeBefore, greaterThan(100000));
 
-    // ---- Pause
-    controller.pauseTask(task);
-    await _waitUntil(
-      () => task.status == DownloadStatus.paused,
-      timeout: const Duration(seconds: 10),
-    );
-    expect(task.pauseRequested, isTrue, reason: 'flagged until resumed');
-    expect(task.process!.exitCode, isNotNull, reason: 'process was killed');
+      // ---- Pause
+      controller.pauseTask(task);
+      await _waitUntil(
+        () => task.status == DownloadStatus.paused,
+        timeout: const Duration(seconds: 10),
+      );
+      expect(task.pauseRequested, isTrue, reason: 'flagged until resumed');
+      expect(task.process!.exitCode, isNotNull, reason: 'process was killed');
 
-    final part = Directory(workDir.path)
-        .listSync()
-        .firstWhere((f) => f.path.endsWith('.part'));
-    final partSizeAfter = part.statSync().size;
-    expect(
-      partSizeAfter,
-      greaterThanOrEqualTo(partSizeBefore),
-      reason: '.part must survive the pause',
-    );
+      final part = Directory(
+        workDir.path,
+      ).listSync().firstWhere((f) => f.path.endsWith('.part'));
+      final partSizeAfter = part.statSync().size;
+      expect(
+        partSizeAfter,
+        greaterThanOrEqualTo(partSizeBefore),
+        reason: '.part must survive the pause',
+      );
 
-    // ---- Resume
-    controller.resumeTask(task);
-    await _waitUntil(
-      () => task.status == DownloadStatus.completed,
-      timeout: const Duration(seconds: 60),
-    );
+      // ---- Resume
+      controller.resumeTask(task);
+      await _waitUntil(
+        () => task.status == DownloadStatus.completed,
+        timeout: const Duration(seconds: 60),
+      );
 
-    final out = File('${workDir.path}/source.unknown_video');
-    expect(out.existsSync(), isTrue, reason: 'final file written');
-    expect(out.lengthSync(), 24 * 1024 * 1024);
-    expect(task.status, DownloadStatus.completed);
-    // Definitive evidence of a real resume: yt-dlp logs the continuation
-    // byte from the .part file.
-    final resumeLine = controller.log
-        .where((l) => l.contains('Resuming download at byte'))
-        .toList();
-    expect(resumeLine, isNotEmpty, reason: 'yt-dlp must resume from .part');
-    expect(
-      int.parse(resumeLine.first.replaceAll(RegExp(r'[^0-9]'), '')),
-      greaterThan(0),
-    );
-  });
+      final out = File('${workDir.path}/source.unknown_video');
+      expect(out.existsSync(), isTrue, reason: 'final file written');
+      expect(out.lengthSync(), 24 * 1024 * 1024);
+      expect(task.status, DownloadStatus.completed);
+      // Definitive evidence of a real resume: yt-dlp logs the continuation
+      // byte from the .part file.
+      final resumeLine = controller.log
+          .where((l) => l.contains('Resuming download at byte'))
+          .toList();
+      expect(resumeLine, isNotEmpty, reason: 'yt-dlp must resume from .part');
+      expect(
+        int.parse(resumeLine.first.replaceAll(RegExp(r'[^0-9]'), '')),
+        greaterThan(0),
+      );
+    },
+  );
 }
 
 Future<void> _waitUntil(

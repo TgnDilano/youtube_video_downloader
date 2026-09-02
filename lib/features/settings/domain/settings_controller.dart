@@ -98,22 +98,22 @@ class SettingsController extends ChangeNotifier {
   }
 
   Future<void> setCustomMain(Color c) => _setCustomColor(
-        apply: () => _customMain = c,
-        storeKey: 'custom_main',
-        color: c,
-      );
+    apply: () => _customMain = c,
+    storeKey: 'custom_main',
+    color: c,
+  );
 
   Future<void> setCustomPrimary(Color c) => _setCustomColor(
-        apply: () => _customPrimary = c,
-        storeKey: 'custom_primary',
-        color: c,
-      );
+    apply: () => _customPrimary = c,
+    storeKey: 'custom_primary',
+    color: c,
+  );
 
   Future<void> setCustomSecondary(Color c) => _setCustomColor(
-        apply: () => _customSecondary = c,
-        storeKey: 'custom_secondary',
-        color: c,
-      );
+    apply: () => _customSecondary = c,
+    storeKey: 'custom_secondary',
+    color: c,
+  );
 
   Future<void> _setCustomColor({
     required void Function() apply,

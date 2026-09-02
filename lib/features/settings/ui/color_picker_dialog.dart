@@ -119,11 +119,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     ),
                     child: TextField(
                       controller: _hex,
-                      style: TText.mono(
-                        context,
-                        size: 13,
-                        color: TColors.text,
-                      ),
+                      style: TText.mono(context, size: 13, color: TColors.text),
                       onSubmitted: _applyHex,
                       onChanged: (t) {
                         if (t.replaceFirst('#', '').length >= 6) _applyHex(t);
@@ -218,9 +214,11 @@ class _SvPad extends StatelessWidget {
                 ),
               ),
               Positioned(
-                left: (hsv.saturation * (width - 2)).clamp(0, width - 2) -
+                left:
+                    (hsv.saturation * (width - 2)).clamp(0, width - 2) -
                     _dot / 2,
-                top: ((1 - hsv.value) * (height - 2)).clamp(0, height - 2) -
+                top:
+                    ((1 - hsv.value) * (height - 2)).clamp(0, height - 2) -
                     _dot / 2,
                 child: IgnorePointer(
                   child: Container(

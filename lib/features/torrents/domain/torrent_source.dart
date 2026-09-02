@@ -11,12 +11,12 @@ class TorrentSource {
   final TorrentSourceKind kind;
 
   const TorrentSource.magnet(String uri)
-      : raw = uri,
-        kind = TorrentSourceKind.magnet;
+    : raw = uri,
+      kind = TorrentSourceKind.magnet;
 
   const TorrentSource.file(String path)
-      : raw = path,
-        kind = TorrentSourceKind.file;
+    : raw = path,
+      kind = TorrentSourceKind.file;
 
   /// Short human-readable label used in the UI (magnet hash or file name).
   String get label {

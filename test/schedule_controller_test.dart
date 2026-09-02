@@ -37,9 +37,7 @@ void main() {
       url: 'https://youtu.be/past',
       when: DateTime.now().subtract(const Duration(minutes: 1)),
     );
-    final fired = await controller.fireDue(
-      enqueue: (p) => enqueued.add(p.url),
-    );
+    final fired = await controller.fireDue(enqueue: (p) => enqueued.add(p.url));
     expect(fired.map((p) => p.url), ['https://youtu.be/past']);
     expect(enqueued, ['https://youtu.be/past']);
     expect(controller.scheduled.length, 1);
@@ -74,10 +72,13 @@ void main() {
     expect(reloaded.scheduled.first.title, 'Persisted clip');
   });
 
-  test('fireDue keeps items alive (not wiped) before the store loads', () async {
-    SharedPreferences.setMockInitialValues({});
-    final notLoaded = ScheduleController();
-    final due = await notLoaded.fireDue(enqueue: (p) {});
-    expect(due, isEmpty);
-  });
+  test(
+    'fireDue keeps items alive (not wiped) before the store loads',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final notLoaded = ScheduleController();
+      final due = await notLoaded.fireDue(enqueue: (p) {});
+      expect(due, isEmpty);
+    },
+  );
 }

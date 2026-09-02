@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
-import 'package:libtorrent_flutter/libtorrent_flutter.dart' as lt;
+import 'package:ytdlapp/src/rust/api/torrent.dart' as rb;
 
 import 'package:ytdlapp/features/torrents/domain/torrent_file_info.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
@@ -46,8 +47,10 @@ class TorrentEngineSnapshot {
   });
 }
 
-/// Thin adapter over `libtorrent_flutter`. This is the **only** file that
-/// imports the plugin; domain and UI stay plugin-free and testable.
+/// Adapter over the librqbit engine (bound through flutter_rust_bridge).
+/// This is the **only** file that talks to the native torrent engine; domain
+/// and UI stay plugin-free and testable. Since librqbit exposes no push
+/// stream over FFI, progress is refreshed via a Dart-side poll loop.
 class TorrentEngine {
   /// Invoked whenever the snapshot map changes (after each engine poll).
   void Function()? tasksChanged;
@@ -55,83 +58,60 @@ class TorrentEngine {
   final Map<int, TorrentEngineSnapshot> _snapshots = {};
 
   bool _initialized = false;
-  StreamSubscription<Map<int, lt.TorrentInfo>>? _subscription;
+  Timer? _pollTimer;
 
   /// Current snapshots keyed by torrent id (insertion/last-update order).
   Map<int, TorrentEngineSnapshot> get snapshots => Map.unmodifiable(_snapshots);
 
-  /// Ensures the libtorrent session is running.
+  /// Ensures the librqbit session is running and starts the progress poll.
   Future<void> initialize() async {
     if (_initialized) return;
-    if (!lt.LibtorrentFlutter.isInitialized) {
-      await lt.LibtorrentFlutter.init();
-    }
-    // Always apply the speed tuning — the session may already exist if the
-    // engine re-initializes, and (re)configuring never hurts.
-    _tuneForSpeed();
-    _subscription ??=
-        lt.LibtorrentFlutter.instance.torrentUpdates.listen(_handleUpdates);
+    // The app always passes an explicit save folder per add, so the session's
+    // default output folder is only a fallback; system temp is fine.
+    await rb.torrentInit(downloadDir: Directory.systemTemp.path);
     _initialized = true;
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _poll());
+    await _poll();
   }
 
-  /// Applies a speed-oriented session configuration so downloads aren't
-  /// throttled by the engine's conservative defaults: unlimited transfer,
-  /// more concurrent piece requests, DHT + UPnP on, longer stall timeout.
-  void _tuneForSpeed() {
+  Future<void> _poll() async {
     try {
-      final engine = lt.LibtorrentFlutter.instance;
-      engine.configureSession(
-        const lt.BtConfig(
-          cacheSize: 128 * 1024 * 1024,
-          readerReadAhead: 95,
-          preloadCache: 50,
-          connectionsLimit: 200,
-          torrentDisconnectTimeout: 300,
-          forceEncrypt: false,
-          disableTcp: false,
-          disableUtp: false,
-          disableUpload: false,
-          disableDht: false,
-          disableUpnp: false,
-          enableIpv6: false,
-          downloadRateLimit: 0,
-          uploadRateLimit: 0,
-          peersListenPort: 0,
-          responsiveMode: true,
-        ),
-      );
-      // Belt-and-braces: even the drop-in speed setters, unlimited.
-      engine.setDownloadLimit(0);
-      engine.setUploadLimit(0);
+      final list = await rb.torrentList();
+      final next = <int, TorrentEngineSnapshot>{};
+      for (final t in list) {
+        next[t.id] = _mapSnapshot(t);
+      }
+      _snapshots
+        ..clear()
+        ..addAll(next);
+      tasksChanged?.call();
     } catch (_) {
-      // Speed tuning is best-effort; never block startup.
+      // Best-effort polling; transient native errors must not crash the loop.
     }
   }
 
   /// Adds a torrent from a magnet URI or a `.torrent` file path.
-  int add(TorrentSource source, String savePath) {
-    final engine = lt.LibtorrentFlutter.instance;
-    final id = source.kind == TorrentSourceKind.magnet
-        ? engine.addMagnet(source.raw, savePath)
-        : engine.addTorrentFile(source.raw, savePath);
+  Future<int> add(TorrentSource source, String savePath) async {
+    final id = await rb.torrentAdd(source: source.raw, savePath: savePath);
+    await _poll();
     return id;
   }
 
   void pause(int id) {
     if (!_initialized) return;
-    lt.LibtorrentFlutter.instance.pauseTorrent(id);
+    unawaited(rb.torrentPause(id: id));
   }
 
   void resume(int id) {
     if (!_initialized) return;
-    lt.LibtorrentFlutter.instance.resumeTorrent(id);
+    unawaited(rb.torrentResume(id: id));
   }
 
   /// Lists the files contained in a torrent once its metadata is available.
   /// Returns an empty list when there's no metadata yet.
   List<TorrentFileInfo> files(int id) {
-    if (!_initialized || !lt.LibtorrentFlutter.isInitialized) return [];
-    final raw = lt.LibtorrentFlutter.instance.getFiles(id);
+    if (!_initialized) return [];
+    final raw = rb.torrentFiles(id: id);
     return [
       for (final f in raw)
         TorrentFileInfo(
@@ -145,22 +125,21 @@ class TorrentEngine {
 
   void remove(int id, {bool deleteFiles = false}) {
     if (!_initialized) return;
-    lt.LibtorrentFlutter.instance.removeTorrent(
-      id,
-      deleteFiles: deleteFiles,
-    );
+    unawaited(rb.torrentDelete(id: id, deleteFiles: deleteFiles));
     _snapshots.remove(id);
-  }
-
-  void _handleUpdates(Map<int, lt.TorrentInfo> torrents) {
-    _snapshots.clear();
-    for (final info in torrents.values) {
-      _snapshots[info.id] = _mapInfo(info);
-    }
     tasksChanged?.call();
   }
 
-  static TorrentEngineSnapshot _mapInfo(lt.TorrentInfo t) {
+  /// Stops the progress poll and drops all state. Safe to call after the
+  /// engine is no longer needed; the session itself stays until app exit.
+  void dispose() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    _snapshots.clear();
+    _initialized = false;
+  }
+
+  static TorrentEngineSnapshot _mapSnapshot(rb.TorrentSnapshot t) {
     return TorrentEngineSnapshot(
       id: t.id,
       name: t.hasMetadata && t.name.isNotEmpty ? t.name : 'Fetching metadata…',
@@ -181,25 +160,19 @@ class TorrentEngine {
     );
   }
 
-  static TorrentStatus _status(lt.TorrentInfo t) {
-    if (t.errorMsg.isNotEmpty) return TorrentStatus.error;
-    if (t.isPaused) return TorrentStatus.paused;
-    if (t.isFinished) return TorrentStatus.seeding;
-    switch (t.state) {
-      case lt.TorrentState.downloadingMetadata:
-        return TorrentStatus.fetchingMetadata;
-      case lt.TorrentState.downloading:
-      case lt.TorrentState.allocating:
-      case lt.TorrentState.checkingFiles:
-      case lt.TorrentState.checkingResume:
-        return TorrentStatus.downloading;
-      case lt.TorrentState.finished:
-      case lt.TorrentState.seeding:
-        return TorrentStatus.seeding;
-      case lt.TorrentState.error:
+  static TorrentStatus _status(rb.TorrentSnapshot t) {
+    switch (t.status) {
+      case 'error':
         return TorrentStatus.error;
-      case lt.TorrentState.unknown:
+      case 'paused':
+        return TorrentStatus.paused;
+      case 'seeding':
+        return TorrentStatus.seeding;
+      case 'fetchingMetadata':
         return TorrentStatus.fetchingMetadata;
+      case 'downloading':
+      default:
+        return TorrentStatus.downloading;
     }
   }
 }

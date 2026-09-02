@@ -44,8 +44,9 @@ class _TubemateCloneState extends State<TubemateClone>
   final ConvertController _convertController = ConvertController();
   final SettingsController _settings = SettingsController();
   final ScheduleController _scheduleController = ScheduleController();
-  final TorrentController _torrentController =
-      TorrentController(engine: TorrentEngine());
+  final TorrentController _torrentController = TorrentController(
+    engine: TorrentEngine(),
+  );
   final ClipboardWatcher _clipboardWatcher = ClipboardWatcher();
   final TextEditingController _urlController = TextEditingController();
   final FocusNode _urlFocusNode = FocusNode();
@@ -223,7 +224,9 @@ class _TubemateCloneState extends State<TubemateClone>
     if (path == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Set a download folder first — Settings › Default folder'),
+          content: Text(
+            'Set a download folder first — Settings › Default folder',
+          ),
         ),
       );
       return;
@@ -246,7 +249,9 @@ class _TubemateCloneState extends State<TubemateClone>
     if (path == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Set a download folder first — Settings › Default folder'),
+          content: Text(
+            'Set a download folder first — Settings › Default folder',
+          ),
         ),
       );
       return;
@@ -284,9 +289,7 @@ class _TubemateCloneState extends State<TubemateClone>
           backgroundColor: TColors.red.withValues(alpha: 0.15),
           content: Row(
             children: [
-              Expanded(
-                child: Text(notifications.join('\n')),
-              ),
+              Expanded(child: Text(notifications.join('\n'))),
               GestureDetector(
                 onTap: () {
                   Clipboard.setData(
@@ -323,11 +326,7 @@ class _TubemateCloneState extends State<TubemateClone>
                   cursor: SystemMouseCursors.click,
                   child: Text(
                     'RETRY',
-                    style: TText.mono(
-                      context,
-                      size: 11,
-                      color: TColors.green,
-                    ),
+                    style: TText.mono(context, size: 11, color: TColors.green),
                   ),
                 ),
               ),
@@ -381,10 +380,10 @@ class _TubemateCloneState extends State<TubemateClone>
   }
 
   bool get _isTransportActive => _controller.tasks.any(
-        (t) =>
-            t.status == DownloadStatus.downloading ||
-            t.status == DownloadStatus.queued,
-      );
+    (t) =>
+        t.status == DownloadStatus.downloading ||
+        t.status == DownloadStatus.queued,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -405,13 +404,13 @@ class _TubemateCloneState extends State<TubemateClone>
                   child: _selectedIndex == 0
                       ? _buildHome()
                       : _selectedIndex == 1
-                          ? ConvertPage(controller: _convertController)
-                          : _selectedIndex == 2
-                              ? SettingsPage(
-                                  settings: _settings,
-                                  controller: _controller,
-                                )
-                              : TorrentsPage(controller: _torrentController),
+                      ? ConvertPage(controller: _convertController)
+                      : _selectedIndex == 2
+                      ? SettingsPage(
+                          settings: _settings,
+                          controller: _controller,
+                        )
+                      : TorrentsPage(controller: _torrentController),
                 ),
               ),
             ),
@@ -492,10 +491,7 @@ class _TubemateCloneState extends State<TubemateClone>
               );
               final taskH = max(200.0, remaining);
               return SliverToBoxAdapter(
-                child: SizedBox(
-                  height: taskH,
-                  child: _buildTaskArea(taskH),
-                ),
+                child: SizedBox(height: taskH, child: _buildTaskArea(taskH)),
               );
             },
           ),
@@ -508,8 +504,7 @@ class _TubemateCloneState extends State<TubemateClone>
     if (_showTerminal) {
       final handleH = 8.0;
       final termMin = 100.0;
-      final maxTerm =
-          (height - handleH - termMin).clamp(0.0, height - handleH);
+      final maxTerm = (height - handleH - termMin).clamp(0.0, height - handleH);
       final termH = maxTerm <= termMin
           ? maxTerm
           : _terminalHeight.clamp(termMin, maxTerm);
@@ -596,14 +591,15 @@ class _TubemateCloneState extends State<TubemateClone>
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'TubeXMate',
-                      style: TText.display(context, size: 30),
-                    ),
+                    Text('TubeXMate', style: TText.display(context, size: 30)),
                     const SizedBox(height: 6),
                     Text(
                       'Drop in a URL, set your range, hit record.',
-                      style: TText.body(context, size: 13.5, color: TColors.textMuted),
+                      style: TText.body(
+                        context,
+                        size: 13.5,
+                        color: TColors.textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -627,7 +623,11 @@ class _TubemateCloneState extends State<TubemateClone>
                   const SizedBox(width: 8),
                   Text(
                     active ? 'Capturing stream' : 'Ready to capture',
-                    style: TText.mono(context, size: 11, color: TColors.textDim),
+                    style: TText.mono(
+                      context,
+                      size: 11,
+                      color: TColors.textDim,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   IconButton(
@@ -660,8 +660,8 @@ class _TubemateCloneState extends State<TubemateClone>
 
     final entryCount = isPlaylist
         ? (info['entries']?.length ??
-            info['n_entries'] ??
-            (info['entries'] == null ? null : 0))
+              info['n_entries'] ??
+              (info['entries'] == null ? null : 0))
         : null;
 
     return Column(
@@ -680,7 +680,10 @@ class _TubemateCloneState extends State<TubemateClone>
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _Thumbnail(url: thumbnailUrl, tag: isPlaylist ? 'Playlist' : 'Video'),
+                    _Thumbnail(
+                      url: thumbnailUrl,
+                      tag: isPlaylist ? 'Playlist' : 'Video',
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -690,7 +693,7 @@ class _TubemateCloneState extends State<TubemateClone>
                             isPlaylist
                                 ? 'Playlist · ${entryCount ?? '…'} items'
                                 : '${info['uploader'] ?? 'YouTube'} · ${info['duration_string'] ?? ''}'
-                                    .toUpperCase(),
+                                      .toUpperCase(),
                             style: TText.mono(
                               context,
                               size: 9.5,
@@ -713,12 +716,14 @@ class _TubemateCloneState extends State<TubemateClone>
                           Text(
                             isPlaylist
                                 ? (info['description']?.toString() ??
-                                    (info['entries'] is List &&
-                                            (info['entries'] as List).isNotEmpty
-                                        ? ((info['entries'] as List).first['title']
-                                                ?.toString() ??
-                                            '')
-                                        : ''))
+                                      (info['entries'] is List &&
+                                              (info['entries'] as List)
+                                                  .isNotEmpty
+                                          ? ((info['entries'] as List)
+                                                    .first['title']
+                                                    ?.toString() ??
+                                                '')
+                                          : ''))
                                 : '${info['uploader'] ?? ''} · ${info['duration_string'] ?? ''}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -743,7 +748,10 @@ class _TubemateCloneState extends State<TubemateClone>
               ),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: TColors.counterBg,
                   border: Border(top: BorderSide(color: TColors.lineSoft)),
@@ -806,9 +814,8 @@ class _TubemateCloneState extends State<TubemateClone>
         MonoCheckbox(
           value: _downloadFullPlaylist,
           label: 'Full playlist',
-          onTap: () => setState(
-            () => _downloadFullPlaylist = !_downloadFullPlaylist,
-          ),
+          onTap: () =>
+              setState(() => _downloadFullPlaylist = !_downloadFullPlaylist),
         ),
         if (!_downloadFullPlaylist && total > 0) ...[
           const SizedBox(width: 18),
@@ -881,7 +888,7 @@ class _TubemateCloneState extends State<TubemateClone>
                       _selectedPlaylistItems = {};
                     } else {
                       _selectedPlaylistItems = {
-                        for (var i = 1; i <= total; i++) i
+                        for (var i = 1; i <= total; i++) i,
                       };
                     }
                   }),
@@ -899,8 +906,7 @@ class _TubemateCloneState extends State<TubemateClone>
                 itemBuilder: (context, index) {
                   final entry = entries[index] as Map? ?? {};
                   final itemIndex = index + 1;
-                  final selected =
-                      _selectedPlaylistItems.contains(itemIndex);
+                  final selected = _selectedPlaylistItems.contains(itemIndex);
                   return _PlaylistItemRow(
                     index: itemIndex,
                     title: entry['title']?.toString() ?? 'Untitled item',
@@ -918,8 +924,8 @@ class _TubemateCloneState extends State<TubemateClone>
                     }),
                     onSelectResolution:
                         entry['url'] != null || entry['webpage_url'] != null
-                            ? () => _pickItemResolution(context, entry, itemIndex)
-                            : null,
+                        ? () => _pickItemResolution(context, entry, itemIndex)
+                        : null,
                   );
                 },
               ),
@@ -1306,8 +1312,7 @@ class _TubemateCloneState extends State<TubemateClone>
       _downloadFullPlaylist = opts.fullPlaylist;
       _selectedPlaylistItems = opts.selectedItems;
       _isAudioOnly = opts.audioOnly;
-      _selectedResolution =
-          opts.audioOnly ? 'audio' : opts.resolution;
+      _selectedResolution = opts.audioOnly ? 'audio' : opts.resolution;
     });
     return true;
   }
@@ -1333,10 +1338,12 @@ class _TubemateCloneState extends State<TubemateClone>
     );
     if (when == null || !mounted) return;
 
-    final audioOnly =
-        isPlaylist ? _isAudioOnly : _selectedResolution == 'audio';
-    final resolution =
-        _selectedResolution == 'audio' ? 'best' : _selectedResolution;
+    final audioOnly = isPlaylist
+        ? _isAudioOnly
+        : _selectedResolution == 'audio';
+    final resolution = _selectedResolution == 'audio'
+        ? 'best'
+        : _selectedResolution;
     await _scheduleController.schedule(
       url: url,
       when: when,
@@ -1344,9 +1351,11 @@ class _TubemateCloneState extends State<TubemateClone>
       resolution: resolution,
       isPlaylist: isPlaylist,
       playlistItems:
-          isPlaylist && !_downloadFullPlaylist && _selectedPlaylistItems.isNotEmpty
-              ? (_selectedPlaylistItems.toList()..sort()).join(',')
-              : null,
+          isPlaylist &&
+              !_downloadFullPlaylist &&
+              _selectedPlaylistItems.isNotEmpty
+          ? (_selectedPlaylistItems.toList()..sort()).join(',')
+          : null,
       title: _currentPreview?['title']?.toString(),
     );
     if (mounted) {
@@ -1397,9 +1406,7 @@ class _TubemateCloneState extends State<TubemateClone>
             : _selectedResolution,
         itemResolutions: _itemResolutions.isEmpty
             ? null
-            : {
-                for (final e in _itemResolutions.entries) '${e.key}': e.value,
-              },
+            : {for (final e in _itemResolutions.entries) '${e.key}': e.value},
         metadata:
             _currentPreview, // Pass metadata to include title for subfolder
       );
@@ -1480,9 +1487,7 @@ class _LiveScheduleRowState extends State<_LiveScheduleRow> {
     return Container(
       decoration: BoxDecoration(
         color: TColors.panel2,
-        border: Border.all(
-          color: due ? TColors.amber : TColors.line,
-        ),
+        border: Border.all(color: due ? TColors.amber : TColors.line),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -1501,11 +1506,7 @@ class _LiveScheduleRowState extends State<_LiveScheduleRow> {
                   planned.title ?? planned.url,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TText.mono(
-                    context,
-                    size: 11.5,
-                    color: TColors.amber,
-                  ),
+                  style: TText.mono(context, size: 11.5, color: TColors.amber),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -1514,11 +1515,7 @@ class _LiveScheduleRowState extends State<_LiveScheduleRow> {
                     '${formatPlannedDate(planned.scheduledAt)} · '
                         '${describeRelative(planned.scheduledAt)}',
                   ].join('\n'),
-                  style: TText.mono(
-                    context,
-                    size: 10,
-                    color: TColors.textDim,
-                  ),
+                  style: TText.mono(context, size: 10, color: TColors.textDim),
                 ),
               ],
             ),
@@ -1577,9 +1574,7 @@ class _ScheduleButtonState extends State<_ScheduleButton> {
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
           decoration: BoxDecoration(
             color: TColors.jackBg,
-            border: Border.all(
-              color: _hovered ? TColors.amber : TColors.line,
-            ),
+            border: Border.all(color: _hovered ? TColors.amber : TColors.line),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1749,9 +1744,7 @@ class _OpenLinkButtonState extends State<_OpenLinkButton> {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            border: Border.all(
-              color: _hovered ? TColors.amber : TColors.line,
-            ),
+            border: Border.all(color: _hovered ? TColors.amber : TColors.line),
           ),
           child: Icon(
             Icons.open_in_new,
@@ -1901,8 +1894,7 @@ class _ResChipButtonState extends State<_ResChipButton> {
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
     return MouseRegion(
-      cursor:
-          enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
       onEnter: enabled ? (_) => setState(() => _hovered = true) : null,
       onExit: enabled ? (_) => setState(() => _hovered = false) : null,
       child: InkWell(
@@ -1923,9 +1915,7 @@ class _ResChipButtonState extends State<_ResChipButton> {
                 style: TText.mono(
                   context,
                   size: 10.5,
-                  color: widget.explicit
-                      ? TColors.amber
-                      : TColors.textMuted,
+                  color: widget.explicit ? TColors.amber : TColors.textMuted,
                 ),
               ),
               const SizedBox(width: 4),

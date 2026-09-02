@@ -99,16 +99,13 @@ class TubemateSidebar extends StatelessWidget {
             child: IgnorePointer(
               child: Scanlines(horizontal: true, color: Color(0x03FFFFFF)),
             ),
-          ),          Column(
+          ),
+          Column(
             children: [
               const SizedBox(height: 14),
               const Center(child: TrafficLights()),
               const SizedBox(height: 14),
-              Container(
-                width: 44,
-                height: 1,
-                color: TColors.line,
-              ),
+              Container(width: 44, height: 1, color: TColors.line),
               const SizedBox(height: 18),
               _Logo(),
               const SizedBox(height: 24),
@@ -181,12 +178,7 @@ class _Logo extends StatelessWidget {
             shape: BoxShape.circle,
             border: Border.all(color: TColors.amber, width: 1.5),
           ),
-          child: Icon(
-            Icons.check,
-            size: 16,
-            color: TColors.amber,
-            weight: 600,
-          ),
+          child: Icon(Icons.check, size: 16, color: TColors.amber, weight: 600),
         ),
       ],
     );

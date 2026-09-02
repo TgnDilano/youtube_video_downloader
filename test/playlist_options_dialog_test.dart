@@ -18,8 +18,9 @@ void main() {
     expect(field.focusNode?.hasFocus, isTrue);
   });
 
-  testWidgets('Close button asks for confirmation before exiting',
-      (tester) async {
+  testWidgets('Close button asks for confirmation before exiting', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(1440, 900);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
@@ -45,8 +46,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Playlist options dialog renders and returns selection',
-      (tester) async {
+  testWidgets('Playlist options dialog renders and returns selection', (
+    tester,
+  ) async {
     final controller = DownloadController();
     PlaylistOptions? result;
 
