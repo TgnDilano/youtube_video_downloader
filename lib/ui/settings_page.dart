@@ -71,319 +71,319 @@ class SettingsPage extends StatelessWidget {
     return ListenableBuilder(
       listenable: settings,
       builder: (context, _) {
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.only(bottom: 18),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: TColors.line)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Media Transport / Configuration',
-                    style: TText.mono(
-                      context,
-                      size: 11,
-                      letterSpacing: 0.18,
-                      color: TColors.amber,
-                    ),
+        return ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: TColors.line)),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Settings',
-                    style: TText.display(context, size: 30),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Set the defaults every capture starts from.',
-                    style: TText.body(
-                      context,
-                      size: 13.5,
-                      color: TColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 30),
-            _GroupLabel(index: '01', label: 'General'),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: TColors.panel2,
-                border: Border.all(color: TColors.line),
-              ),
-              child: _SettingRow(
-                onTap: () async {
-                  String? path = await FilePicker.platform.getDirectoryPath();
-                  if (path != null) {
-                    settings.setDefaultDownloadPath(path);
-                  }
-                },
-                leading: _Jack(
-                  child: Icon(
-                    Icons.folder_outlined,
-                    size: 14,
-                    color: TColors.amber,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Media Transport / Configuration',
+                        style: TText.mono(
+                          context,
+                          size: 11,
+                          letterSpacing: 0.18,
+                          color: TColors.amber,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Settings', style: TText.display(context, size: 30)),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Set the defaults every capture starts from.',
+                        style: TText.body(
+                          context,
+                          size: 13.5,
+                          color: TColors.textMuted,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                title: 'Default download folder',
-                subtitle: settings.defaultDownloadPath ?? 'Not set',
-                pathStyle: true,
-                trailing: _Chevron(),
-              ),
-            ),
-            const SizedBox(height: 36),
-            _GroupLabel(index: '02', label: 'Downloads'),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: TColors.panel2,
-                border: Border.all(color: TColors.line),
-              ),
-              child: Column(
-                children: [
-                  _SettingRow(
-                    leading: _Jack(
-                      monoText: 'HQ',
-                    ),
-                    title: 'Default resolution',
-                    subtitle: 'Applied to every new capture unless overridden',
-                    trailing: _DialSelect(
-                      value: settings.defaultResolution,
-                      label: _resolutionLabel(settings.defaultResolution),
-                      onChanged: settings.setDefaultResolution,
-                    ),
+                const SizedBox(height: 30),
+                _GroupLabel(index: '01', label: 'General'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: TColors.panel2,
+                    border: Border.all(color: TColors.line),
                   ),
-                  Divider(height: 1, color: TColors.lineSoft),
-                  _SettingRow(
+                  child: _SettingRow(
+                    onTap: () async {
+                      String? path = await FilePicker.platform
+                          .getDirectoryPath();
+                      if (path != null) {
+                        settings.setDefaultDownloadPath(path);
+                      }
+                    },
                     leading: _Jack(
                       child: Icon(
-                        Icons.download_outlined,
+                        Icons.folder_outlined,
                         size: 14,
                         color: TColors.amber,
                       ),
                     ),
-                    title: 'Auto-fetch preview',
-                    subtitle:
-                        'Fetch video info the moment a link lands in the input',
-                    trailing: TubemateSwitch(
-                      value: settings.isAutoPreviewEnabled,
-                      onChanged: settings.setAutoPreview,
-                      activeColor: TColors.green,
-                      glow: true,
-                    ),
+                    title: 'Default download folder',
+                    subtitle: settings.defaultDownloadPath ?? 'Not set',
+                    pathStyle: true,
+                    trailing: _Chevron(),
                   ),
-                  Divider(height: 1, color: TColors.lineSoft),
-                  _SettingRow(
-                    leading: _Jack(
-                      child: Icon(
-                        Icons.content_paste_go,
-                        size: 14,
-                        color: TColors.green,
-                      ),
-                    ),
-                    title: 'Clipboard watchdog',
-                    subtitle:
-                        'Detects a copied YouTube link and offers to queue it',
-                    trailing: TubemateSwitch(
-                      value: settings.isClipboardMonitorEnabled,
-                      onChanged: settings.setClipboardMonitor,
-                      activeColor: TColors.green,
-                      glow: true,
-                    ),
+                ),
+                const SizedBox(height: 36),
+                _GroupLabel(index: '02', label: 'Downloads'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: TColors.panel2,
+                    border: Border.all(color: TColors.line),
                   ),
-                  Divider(height: 1, color: TColors.lineSoft),
-                  _SettingRow(
-                    leading: _Jack(
-                      child: Icon(
-                        Icons.key_outlined,
-                        size: 14,
-                        color: TColors.green,
-                      ),
-                    ),
-                    title: 'YouTube cookie source',
-                    subtitle:
-                        'Fixes "HTTP Error 403: Forbidden". Pick the browser '
-                        'you are logged into YouTube with.',
-                    trailing: _DialSelect(
-                      value: settings.cookieBrowser,
-                      label: _cookieLabel(settings.cookieBrowser),
-                      onChanged: settings.setCookieBrowser,
-                      options: _cookieOptions,
-                      accentColor: TColors.green,
-                    ),
-                  ),
-                  Divider(height: 1, color: TColors.lineSoft),
-                  _SettingRow(
-                    leading: _Jack(
-                      child: Icon(
-                        Icons.file_open_outlined,
-                        size: 14,
-                        color: TColors.amber,
-                      ),
-                    ),
-                    title: 'Cookies file (safer)',
-                    subtitle: settings.cookiesFile != null
-                        ? 'Priority use in downloads — no Keychain access'
-                        : 'Export a cookies.txt (YouTube log-in) and pick it — '
-                            'narrowest option, no browser access',
-                    trailing: GestureDetector(
-                      onTap: () async {
-                        final picked = await FilePicker.platform.pickFiles(
-                          dialogTitle: 'Select cookies.txt',
-                          type: FileType.any,
-                        );
-                        if (picked != null &&
-                            picked.files.single.path != null) {
-                          settings.setCookiesFile(picked.files.single.path);
-                        } else if (settings.cookiesFile != null) {
-                          // Tapping with a file set clears it.
-                          settings.setCookiesFile(null);
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.only(left: 8, right: 14),
-                        decoration: BoxDecoration(
-                          color: TColors.jackBg,
-                          border: Border.all(color: TColors.line),
+                  child: Column(
+                    children: [
+                      _SettingRow(
+                        leading: _Jack(monoText: 'HQ'),
+                        title: 'Default resolution',
+                        subtitle:
+                            'Applied to every new capture unless overridden',
+                        trailing: _DialSelect(
+                          value: settings.defaultResolution,
+                          label: _resolutionLabel(settings.defaultResolution),
+                          onChanged: settings.setDefaultResolution,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      ),
+                      Divider(height: 1, color: TColors.lineSoft),
+                      _SettingRow(
+                        leading: _Jack(
+                          child: Icon(
+                            Icons.download_outlined,
+                            size: 14,
+                            color: TColors.amber,
+                          ),
+                        ),
+                        title: 'Auto-fetch preview',
+                        subtitle:
+                            'Fetch video info the moment a link lands in the input',
+                        trailing: TubemateSwitch(
+                          value: settings.isAutoPreviewEnabled,
+                          onChanged: settings.setAutoPreview,
+                          activeColor: TColors.green,
+                          glow: true,
+                        ),
+                      ),
+                      Divider(height: 1, color: TColors.lineSoft),
+                      _SettingRow(
+                        leading: _Jack(
+                          child: Icon(
+                            Icons.content_paste_go,
+                            size: 14,
+                            color: TColors.green,
+                          ),
+                        ),
+                        title: 'Clipboard watchdog',
+                        subtitle:
+                            'Detects a copied YouTube link and offers to queue it',
+                        trailing: TubemateSwitch(
+                          value: settings.isClipboardMonitorEnabled,
+                          onChanged: settings.setClipboardMonitor,
+                          activeColor: TColors.green,
+                          glow: true,
+                        ),
+                      ),
+                      Divider(height: 1, color: TColors.lineSoft),
+                      _SettingRow(
+                        leading: _Jack(
+                          child: Icon(
+                            Icons.key_outlined,
+                            size: 14,
+                            color: TColors.green,
+                          ),
+                        ),
+                        title: 'YouTube cookie source',
+                        subtitle:
+                            'Fixes "HTTP Error 403: Forbidden". Pick the browser '
+                            'you are logged into YouTube with.',
+                        trailing: _DialSelect(
+                          value: settings.cookieBrowser,
+                          label: _cookieLabel(settings.cookieBrowser),
+                          onChanged: settings.setCookieBrowser,
+                          options: _cookieOptions,
+                          accentColor: TColors.green,
+                        ),
+                      ),
+                      Divider(height: 1, color: TColors.lineSoft),
+                      _SettingRow(
+                        leading: _Jack(
+                          child: Icon(
+                            Icons.file_open_outlined,
+                            size: 14,
+                            color: TColors.amber,
+                          ),
+                        ),
+                        title: 'Cookies file (safer)',
+                        subtitle: settings.cookiesFile != null
+                            ? 'Priority use in downloads — no Keychain access'
+                            : 'Export a cookies.txt (YouTube log-in) and pick it — '
+                                  'narrowest option, no browser access',
+                        trailing: GestureDetector(
+                          onTap: () async {
+                            final picked = await FilePicker.platform.pickFiles(
+                              dialogTitle: 'Select cookies.txt',
+                              type: FileType.any,
+                            );
+                            if (picked != null &&
+                                picked.files.single.path != null) {
+                              settings.setCookiesFile(picked.files.single.path);
+                            } else if (settings.cookiesFile != null) {
+                              // Tapping with a file set clears it.
+                              settings.setCookiesFile(null);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.only(left: 8, right: 14),
+                            decoration: BoxDecoration(
+                              color: TColors.jackBg,
+                              border: Border.all(color: TColors.line),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CustomPaint(
+                                  size: const Size.square(22),
+                                  painter: _DialPainter(
+                                    color: settings.cookiesFile != null
+                                        ? TColors.green
+                                        : TColors.textDim,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  settings.cookiesFile != null
+                                      ? 'SET'
+                                      : 'PICK FILE',
+                                  style: TText.mono(
+                                    context,
+                                    size: 12.5,
+                                    color: settings.cookiesFile != null
+                                        ? TColors.green
+                                        : TColors.text,
+                                  ).copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 36),
+                _GroupLabel(index: '03', label: 'Appearance'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: TColors.panel2,
+                    border: Border.all(color: TColors.line),
+                  ),
+                  child: Column(
+                    children: [
+                      _SettingRow(
+                        leading: _Jack(
+                          child: Icon(
+                            Icons.palette_outlined,
+                            size: 14,
+                            color: TColors.amber,
+                          ),
+                        ),
+                        title: 'Color scheme',
+                        subtitle: 'Pick a preset or tune the three app colors',
+                        trailing: const SizedBox(width: 0),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
-                            CustomPaint(
-                              size: const Size.square(22),
-                              painter: _DialPainter(
-                                color: settings.cookiesFile != null
-                                    ? TColors.green
-                                    : TColors.textDim,
+                            _SchemeTile(
+                              scheme: TColorScheme.custom(
+                                main: settings.effectiveMain,
+                                primary: settings.effectivePrimary,
+                                secondary: settings.effectiveSecondary,
                               ),
+                              selected: settings.themeId == 'custom',
+                              onTap: () => settings.setTheme('custom'),
                             ),
-                            const SizedBox(width: 10),
-                            Text(
-                              settings.cookiesFile != null
-                                  ? 'SET'
-                                  : 'PICK FILE',
-                              style: TText.mono(
-                                context,
-                                size: 12.5,
-                                color: settings.cookiesFile != null
-                                    ? TColors.green
-                                    : TColors.text,
-                              ).copyWith(fontWeight: FontWeight.w600),
-                            ),
+                            for (final scheme in kColorSchemes)
+                              _SchemeTile(
+                                scheme: scheme,
+                                selected: settings.themeId == scheme.id,
+                                onTap: () => settings.setTheme(scheme.id),
+                              ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 36),
-            _GroupLabel(index: '03', label: 'Appearance'),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: TColors.panel2,
-                border: Border.all(color: TColors.line),
-              ),
-              child: Column(
-                children: [
-                  _SettingRow(
-                    leading: _Jack(
-                      child: Icon(
-                        Icons.palette_outlined,
-                        size: 14,
-                        color: TColors.amber,
-                      ),
-                    ),
-                    title: 'Color scheme',
-                    subtitle: 'Pick a preset or tune the three app colors',
-                    trailing: const SizedBox(width: 0),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _SchemeTile(
-                          scheme: TColorScheme.custom(
-                            main: settings.effectiveMain,
-                            primary: settings.effectivePrimary,
-                            secondary: settings.effectiveSecondary,
-                          ),
-                          selected: settings.themeId == 'custom',
-                          onTap: () => settings.setTheme('custom'),
+                      Divider(height: 1, color: TColors.lineSoft),
+                      _ColorEditorRow(
+                        label: 'App',
+                        color: settings.effectiveMain,
+                        description: 'Background & panels',
+                        onPick: () => _pickColor(
+                          context,
+                          title: 'App color',
+                          initial: settings.effectiveMain,
+                          onApply: settings.setCustomMain,
                         ),
-                        for (final scheme in kColorSchemes)
-                          _SchemeTile(
-                            scheme: scheme,
-                            selected: settings.themeId == scheme.id,
-                            onTap: () => settings.setTheme(scheme.id),
-                          ),
-                      ],
-                    ),
+                      ),
+                      Divider(height: 1, color: TColors.lineSoft),
+                      _ColorEditorRow(
+                        label: 'Primary',
+                        color: settings.effectivePrimary,
+                        description: 'Amber accents',
+                        onPick: () => _pickColor(
+                          context,
+                          title: 'Primary accent',
+                          initial: settings.effectivePrimary,
+                          onApply: settings.setCustomPrimary,
+                        ),
+                      ),
+                      Divider(height: 1, color: TColors.lineSoft),
+                      _ColorEditorRow(
+                        label: 'Secondary',
+                        color: settings.effectiveSecondary,
+                        description: 'Green accents',
+                        onPick: () => _pickColor(
+                          context,
+                          title: 'Secondary accent',
+                          initial: settings.effectiveSecondary,
+                          onApply: settings.setCustomSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
-                  Divider(height: 1, color: TColors.lineSoft),
-                  _ColorEditorRow(
-                    label: 'App',
-                    color: settings.effectiveMain,
-                    description: 'Background & panels',
-                    onPick: () => _pickColor(
-                      context,
-                      title: 'App color',
-                      initial: settings.effectiveMain,
-                      onApply: settings.setCustomMain,
-                    ),
+                ),
+                const SizedBox(height: 36),
+                _GroupLabel(index: '04', label: 'Engine'),
+                const SizedBox(height: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    color: TColors.panel2,
+                    border: Border.all(color: TColors.line),
                   ),
-                  Divider(height: 1, color: TColors.lineSoft),
-                  _ColorEditorRow(
-                    label: 'Primary',
-                    color: settings.effectivePrimary,
-                    description: 'Amber accents',
-                    onPick: () => _pickColor(
-                      context,
-                      title: 'Primary accent',
-                      initial: settings.effectivePrimary,
-                      onApply: settings.setCustomPrimary,
-                    ),
-                  ),
-                  Divider(height: 1, color: TColors.lineSoft),
-                  _ColorEditorRow(
-                    label: 'Secondary',
-                    color: settings.effectiveSecondary,
-                    description: 'Green accents',
-                    onPick: () => _pickColor(
-                      context,
-                      title: 'Secondary accent',
-                      initial: settings.effectiveSecondary,
-                      onApply: settings.setCustomSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                  child: _EngineGroup(controller: controller),
+                ),
+                const SizedBox(height: 8),
+                const _VersionStrip(),
+              ],
             ),
-            const SizedBox(height: 36),
-            _GroupLabel(index: '04', label: 'Engine'),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                color: TColors.panel2,
-                border: Border.all(color: TColors.line),
-              ),
-              child: _EngineGroup(controller: controller),
-            ),
-            const SizedBox(height: 8),
-            const _VersionStrip(),
-            ],
           ),
         );
       },
@@ -611,7 +611,11 @@ class _SettingRow extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: TText.body(context, size: 14.5, weight: FontWeight.w500),
+                      style: TText.body(
+                        context,
+                        size: 14.5,
+                        weight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -680,11 +684,7 @@ class _Jack extends StatelessWidget {
 class _Chevron extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return const Icon(
-      Icons.chevron_right,
-      size: 15,
-      color: TColors.textDim,
-    );
+    return const Icon(Icons.chevron_right, size: 15, color: TColors.textDim);
   }
 }
 
@@ -790,11 +790,7 @@ class _EngineGroupState extends State<_EngineGroup> {
   Widget build(BuildContext context) {
     return _SettingRow(
       leading: _Jack(
-        child: Icon(
-          Icons.settings_ethernet,
-          size: 14,
-          color: TColors.amber,
-        ),
+        child: Icon(Icons.settings_ethernet, size: 14, color: TColors.amber),
       ),
       title: 'Download engine',
       subtitle: _subtitle,
@@ -879,7 +875,9 @@ class _DialSelect extends StatelessWidget {
     return GestureDetector(
       onTap: () async {
         final box = context.findRenderObject() as RenderBox;
-        final offset = box.localToGlobal(Offset(box.size.width, box.size.height));
+        final offset = box.localToGlobal(
+          Offset(box.size.width, box.size.height),
+        );
         final selected = await showMenu<String>(
           context: context,
           position: RelativeRect.fromLTRB(
@@ -929,15 +927,18 @@ class _DialSelect extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-              CustomPaint(
-                size: const Size.square(22),
-                painter: _DialPainter(color: accent),
-              ),
+            CustomPaint(
+              size: const Size.square(22),
+              painter: _DialPainter(color: accent),
+            ),
             const SizedBox(width: 10),
             Text(
               label,
-              style: TText.mono(context, size: 13, color: TColors.text)
-                  .copyWith(fontWeight: FontWeight.w600),
+              style: TText.mono(
+                context,
+                size: 13,
+                color: TColors.text,
+              ).copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(width: 6),
             const Icon(Icons.arrow_drop_down, size: 13, color: TColors.textDim),
