@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ytdlapp/src/rust/api/torrent.dart' as rb;
+export 'package:ytdlapp/src/rust/api/torrent.dart' show TorrentError;
 
 import 'package:ytdlapp/features/torrents/domain/torrent_file_info.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
@@ -84,11 +85,24 @@ class TorrentEngine {
       _snapshots
         ..clear()
         ..addAll(next);
+
+      // Drain pending magnet errors from Rust (timeout / add failure).
+      final errors = await pendingErrors();
+      for (final e in errors) {
+        _pendingErrors[e.savePath] = e.message;
+      }
+
       tasksChanged?.call();
     } catch (_) {
       // Best-effort polling; transient native errors must not crash the loop.
     }
   }
+
+  /// Pending magnet errors keyed by save_path, drained each poll cycle.
+  final Map<String, String> _pendingErrors = {};
+
+  /// Returns and clears any pending errors for [savePath].
+  String? takeError(String savePath) => _pendingErrors.remove(savePath);
 
   /// Adds a torrent from a magnet URI or a `.torrent` file path.
   /// Returns the native torrent id on success.
@@ -98,6 +112,24 @@ class TorrentEngine {
     // Immediately poll so the new torrent appears in snapshots.
     await _poll();
     return id;
+  }
+
+  /// Re-adds a persisted torrent to the engine (used on startup restore).
+  /// Returns the new engine id, or `null` if the re-add failed (e.g. missing
+  /// `.torrent` file) or the torrent already exists in the engine.
+  Future<int?> reAdd(TorrentSource source, String savePath) async {
+    try {
+      // Check if the engine already has a torrent with this save path + source.
+      // If so, just return its id without re-adding.
+      for (final snap in _snapshots.values) {
+        if (snap.savePath == savePath) {
+          return snap.id;
+        }
+      }
+      return await add(source, savePath);
+    } catch (_) {
+      return null;
+    }
   }
 
   void pause(int id) {
@@ -131,6 +163,17 @@ class TorrentEngine {
     unawaited(rb.torrentDelete(id: id, deleteFiles: deleteFiles));
     _snapshots.remove(id);
     tasksChanged?.call();
+  }
+
+  /// Drains any pending magnet errors from the Rust side (timeout / add
+  /// failure).  Each error is keyed by its save_path.
+  Future<List<rb.TorrentError>> pendingErrors() async {
+    if (!_initialized) return [];
+    try {
+      return await rb.torrentPendingErrors();
+    } catch (_) {
+      return [];
+    }
   }
 
   /// Stops the progress poll and drops all state. Safe to call after the

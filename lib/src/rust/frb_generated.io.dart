@@ -38,10 +38,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<TorrentError> dco_decode_list_torrent_error(dynamic raw);
+
+  @protected
   List<TorrentFileInfo> dco_decode_list_torrent_file_info(dynamic raw);
 
   @protected
   List<TorrentSnapshot> dco_decode_list_torrent_snapshot(dynamic raw);
+
+  @protected
+  TorrentError dco_decode_torrent_error(dynamic raw);
 
   @protected
   TorrentFileInfo dco_decode_torrent_file_info(dynamic raw);
@@ -77,6 +83,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<TorrentError> sse_decode_list_torrent_error(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<TorrentFileInfo> sse_decode_list_torrent_file_info(
     SseDeserializer deserializer,
   );
@@ -85,6 +96,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<TorrentSnapshot> sse_decode_list_torrent_snapshot(
     SseDeserializer deserializer,
   );
+
+  @protected
+  TorrentError sse_decode_torrent_error(SseDeserializer deserializer);
 
   @protected
   TorrentFileInfo sse_decode_torrent_file_info(SseDeserializer deserializer);
@@ -129,6 +143,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_torrent_error(
+    List<TorrentError> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_torrent_file_info(
     List<TorrentFileInfo> self,
     SseSerializer serializer,
@@ -139,6 +159,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     List<TorrentSnapshot> self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_torrent_error(TorrentError self, SseSerializer serializer);
 
   @protected
   void sse_encode_torrent_file_info(

@@ -6,14 +6,20 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `api`, `build_snapshot`, `build_status_string`, `file_infos`, `is_paused`, `looks_like_url`, `snapshot_for`
+// These functions are ignored because they are not marked as `pub`: `api`, `build_snapshot`, `build_status_string`, `file_infos`, `is_magnet`, `is_paused`, `looks_like_url`, `snapshot_for`
 
 /// Starts the librqbit session. [download_dir] is the default output folder.
+/// Also installs a tracing subscriber so `info!`/`warn!`/`error!` logs from
+/// librqbit and this module are visible in the Flutter debug console.
 Future<void> torrentInit({required String downloadDir}) =>
     RustLib.instance.api.crateApiTorrentTorrentInit(downloadDir: downloadDir);
 
 /// Adds a torrent from a magnet/URL or a local `.torrent` file path, saving
 /// into [save_path]. Returns the new torrent id.
+///
+/// For magnets, the native add is spawned as an independent tokio task so the
+/// Dart side is never blocked.  The torrent appears in `torrent_list` once
+/// metadata is resolved by DHT/tracker (typically 5-30 s).
 Future<int> torrentAdd({required String source, required String savePath}) =>
     RustLib.instance.api.crateApiTorrentTorrentAdd(
       source: source,
@@ -23,6 +29,11 @@ Future<int> torrentAdd({required String source, required String savePath}) =>
 /// Lists all torrents with their current stats.
 Future<List<TorrentSnapshot>> torrentList() =>
     RustLib.instance.api.crateApiTorrentTorrentList();
+
+/// Returns any pending magnet errors (timeout or add failure), keyed by
+/// save_path.  The caller should clear entries after handling them.
+Future<List<TorrentError>> torrentPendingErrors() =>
+    RustLib.instance.api.crateApiTorrentTorrentPendingErrors();
 
 /// Returns the current stats for a single torrent id.
 Future<TorrentSnapshot> torrentStats({required int id}) =>
@@ -46,6 +57,25 @@ Future<void> torrentDelete({required int id, required bool deleteFiles}) =>
       id: id,
       deleteFiles: deleteFiles,
     );
+
+/// A magnet that failed to resolve metadata.
+class TorrentError {
+  final String savePath;
+  final String message;
+
+  const TorrentError({required this.savePath, required this.message});
+
+  @override
+  int get hashCode => savePath.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TorrentError &&
+          runtimeType == other.runtimeType &&
+          savePath == other.savePath &&
+          message == other.message;
+}
 
 /// A single file inside a torrent.
 class TorrentFileInfo {

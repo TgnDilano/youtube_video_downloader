@@ -1,17 +1,24 @@
 use std::{
+    collections::HashMap,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use librqbit::{
     api::{Api, ApiTorrentListOpts, TorrentDetailsResponse, TorrentIdOrHash},
-    AddTorrent, AddTorrentOptions, TorrentStats,
+    AddTorrent, AddTorrentOptions, SessionOptions, TorrentStats,
 };
-use tracing::info;
+use tracing::{info, warn, error};
 
 /// Global, lazily-initialized librqbit session API. flutter_rust_bridge calls
 /// are stateless from Dart's perspective, so all state lives here.
 static SESSION: Mutex<Option<Arc<Api>>> = Mutex::new(None);
+
+/// Shared map of magnet save-paths that failed or timed out.
+/// Key = save_path, Value = error message.
+/// Polled by the Dart controller so placeholders can show an error.
+static PENDING_ERRORS: LazyLock<Mutex<HashMap<String, String>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn api() -> anyhow::Result<Arc<Api>> {
     SESSION
@@ -22,10 +29,32 @@ fn api() -> anyhow::Result<Arc<Api>> {
 }
 
 /// Starts the librqbit session. [download_dir] is the default output folder.
+/// Also installs a tracing subscriber so `info!`/`warn!`/`error!` logs from
+/// librqbit and this module are visible in the Flutter debug console.
 #[flutter_rust_bridge::frb]
 pub async fn torrent_init(download_dir: String) -> anyhow::Result<()> {
+    // Install a tracing subscriber if one isn't already set up.
+    // Uses RUST_LOG env var (e.g. RUST_LOG=info,librqbit=debug).
+    // Default shows info for our code, debug for librqbit internals, and
+    // trace for DHT so peer discovery / query activity is visible.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| {
+                    "info,librqbit=debug,librqbit_dht=trace,librqbit_peer_protocol=debug"
+                        .parse()
+                        .unwrap()
+                }),
+        )
+        .with_target(true)
+        .try_init();
+
     info!("initializing torrent session with download_dir={}", download_dir);
-    let session = librqbit::Session::new(PathBuf::from(download_dir)).await?;
+    let opts = SessionOptions {
+        fastresume: true,
+        ..Default::default()
+    };
+    let session = librqbit::Session::new_with_opts(PathBuf::from(&download_dir), opts).await?;
     let api = Api::new(session, None);
     let mut guard = SESSION.lock().map_err(|_| anyhow::anyhow!("lock poisoned"))?;
     *guard = Some(Arc::new(api));
@@ -43,6 +72,10 @@ fn is_magnet(s: &str) -> bool {
 
 /// Adds a torrent from a magnet/URL or a local `.torrent` file path, saving
 /// into [save_path]. Returns the new torrent id.
+///
+/// For magnets, the native add is spawned as an independent tokio task so the
+/// Dart side is never blocked.  The torrent appears in `torrent_list` once
+/// metadata is resolved by DHT/tracker (typically 5-30 s).
 #[flutter_rust_bridge::frb]
 pub async fn torrent_add(source: String, save_path: String) -> anyhow::Result<u32> {
     let api = api()?;
@@ -52,7 +85,9 @@ pub async fn torrent_add(source: String, save_path: String) -> anyhow::Result<u3
         anyhow::bail!("torrent source is empty");
     }
 
-    let add = if is_magnet(&source) {
+    let is_magnet_source = is_magnet(&source);
+
+    let add = if is_magnet_source {
         info!("adding torrent from magnet link");
         if !source.contains("xt=urn:btih:") {
             anyhow::bail!(
@@ -68,17 +103,70 @@ pub async fn torrent_add(source: String, save_path: String) -> anyhow::Result<u3
         AddTorrent::from_local_filename(&source)?
     };
 
+    let err_path = save_path.clone();
     let opts = AddTorrentOptions {
         output_folder: Some(save_path),
         ..Default::default()
     };
 
-    let resp = api.api_add_torrent(add, Some(opts)).await?;
-    let id = resp
-        .id
-        .ok_or_else(|| anyhow::anyhow!("torrent was not assigned an id"))?;
-    info!("torrent added successfully with id={}", id);
-    Ok(id as u32)
+    if is_magnet_source {
+        // Spawn the magnet add as a detached tokio task so metadata resolution
+        // (DHT / tracker) happens in the background.  The torrent will appear
+        // in `torrent_list` once the future completes — the Dart poll loop
+        // picks it up automatically.
+        info!("spawning background magnet add task");
+        let api_clone = api.clone();
+        tokio::spawn(async move {
+            info!("[magnet] background task started, waiting for metadata...");
+            let result = tokio::time::timeout(
+                std::time::Duration::from_secs(120),
+                api_clone.api_add_torrent(add, Some(opts)),
+            )
+            .await;
+
+            match result {
+                Ok(Ok(resp)) => {
+                    let id_str = resp.id.map(|i| i.to_string()).unwrap_or_default();
+                    info!("[magnet] background add completed successfully, id={}", id_str);
+                }
+                Ok(Err(e)) => {
+                    error!("[magnet] background add failed: {:#}", e);
+                    if let Ok(mut map) = PENDING_ERRORS.lock() {
+                        map.insert(err_path, format!("Add failed: {:#}", e));
+                    }
+                }
+                Err(_elapsed) => {
+                    warn!(
+                        "[magnet] metadata resolution timed out after 120s — \
+                         DHT/tracker could not deliver metadata. Check your \
+                         network connection, firewall, and ensure DHT port 6881 is open."
+                    );
+                    if let Ok(mut map) = PENDING_ERRORS.lock() {
+                        map.insert(err_path, "Metadata timed out — check network/DHT".into());
+                    }
+                }
+            }
+        });
+        // Return a sentinel id.  The Dart controller should NOT use this id
+        // for pause/resume — it should rely on the poll loop to discover the
+        // real torrent id.
+        //
+        // Use a large id that won't collide with real librqbit ids (which
+        // are small sequential numbers).
+        let sentinel = u32::MAX - 1;
+        info!(
+            "magnet add spawned in background; sentinel id={} returned",
+            sentinel
+        );
+        Ok(sentinel)
+    } else {
+        let resp = api.api_add_torrent(add, Some(opts)).await?;
+        let id = resp
+            .id
+            .ok_or_else(|| anyhow::anyhow!("torrent was not assigned an id"))?;
+        info!("torrent added successfully with id={}", id);
+        Ok(id as u32)
+    }
 }
 
 /// Lists all torrents with their current stats.
@@ -93,6 +181,29 @@ pub async fn torrent_list() -> anyhow::Result<Vec<TorrentSnapshot>> {
         }
     }
     Ok(out)
+}
+
+/// Returns any pending magnet errors (timeout or add failure), keyed by
+/// save_path.  The caller should clear entries after handling them.
+#[flutter_rust_bridge::frb]
+pub async fn torrent_pending_errors() -> anyhow::Result<Vec<TorrentError>> {
+    let mut map = PENDING_ERRORS
+        .lock()
+        .map_err(|_| anyhow::anyhow!("pending_errors lock poisoned"))?;
+    let out: Vec<TorrentError> = map
+        .drain()
+        .map(|(path, message)| TorrentError {
+            save_path: path,
+            message,
+        })
+        .collect();
+    Ok(out)
+}
+
+/// A magnet that failed to resolve metadata.
+pub struct TorrentError {
+    pub save_path: String,
+    pub message: String,
 }
 
 /// Returns the current stats for a single torrent id.

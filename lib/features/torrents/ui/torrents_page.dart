@@ -9,8 +9,8 @@ import 'package:ytdlapp/features/torrents/domain/torrent_controller.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
 import 'package:ytdlapp/features/torrents/ui/widgets/remove_torrent_dialog.dart';
-import 'package:ytdlapp/features/torrents/ui/widgets/torrent_card.dart';
 import 'package:ytdlapp/features/torrents/ui/widgets/torrent_details_dialog.dart';
+import 'package:ytdlapp/features/torrents/ui/widgets/torrents_table.dart';
 
 /// The Torrents transport page: asks for a magnet link or `.torrent` file plus
 /// a save folder, then lists running torrents.
@@ -140,19 +140,37 @@ class _TorrentsPageState extends State<TorrentsPage> {
       return;
     }
     if (_isAdding) return;
-    setState(() => _isAdding = true);
+
+    // Clear the input immediately so the user can queue another torrent.
+    _magnetController.clear();
+    setState(() {
+      _isAdding = true;
+      _filePath = null;
+      _pendingSource = null;
+    });
+
+    // Fire the add task without blocking the UI.  The poll loop will pick up
+    // the torrent as soon as it appears in the engine (even before metadata
+    // resolves for magnets).
     try {
       final id = await widget.controller.addTorrent(source, savePath);
-      final task = widget.controller.tasks.firstWhere(
-        (t) => t.id == id,
-        orElse: () => TorrentTask(id: id),
-      );
-      await _showDetails(task);
-      _magnetController.clear();
-      setState(() {
-        _filePath = null;
-        _pendingSource = null;
-      });
+      if (source.kind == TorrentSourceKind.magnet && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Magnet added — resolving metadata via DHT… '
+              'the torrent will appear once metadata arrives.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      } else if (source.kind == TorrentSourceKind.file && mounted) {
+        final task = widget.controller.tasks.firstWhere(
+          (t) => t.id == id,
+          orElse: () => TorrentTask(id: id),
+        );
+        await _showDetails(task);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -221,18 +239,13 @@ class _TorrentsPageState extends State<TorrentsPage> {
         Expanded(
           child: tasks.isEmpty
               ? _buildEmpty(context)
-              : ListView(
-                  children: [
-                    for (final task in tasks)
-                      TorrentCard(
-                        task: task,
-                        onPause: () => widget.controller.pause(task.id),
-                        onResume: () => widget.controller.resume(task.id),
-                        onRemove: () => _confirmRemove(task),
-                        onDetails: () => _showDetails(task),
-                        onShowInFolder: () => _showInFolder(task),
-                      ),
-                  ],
+              : TorrentsTable(
+                  tasks: tasks,
+                  onPause: (t) => widget.controller.pause(t.id),
+                  onResume: (t) => widget.controller.resume(t.id),
+                  onRemove: (t) => _confirmRemove(t),
+                  onDetails: (t) => _showDetails(t),
+                  onShowInFolder: (t) => _showInFolder(t),
                 ),
         ),
       ],
