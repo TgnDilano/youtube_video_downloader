@@ -6,4 +6,5 @@ channel = "1.98.0"
 # builds in Step 7, as each requires its std to be downloaded.
 targets = [
   "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
 ]

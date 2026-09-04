@@ -1,5 +1,7 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ytdlapp/core/theme/app_theme.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_controller.dart';
@@ -136,6 +138,29 @@ class _TorrentsPageState extends State<TorrentsPage> {
     setState(() {});
   }
 
+  /// Opens the torrent's downloaded file (or its folder for multi-file
+  /// torrents) in the OS file manager. Desktop platforms only: url_launcher
+  /// cannot open a file manager on Android/iOS, so mobile is left out for now.
+  Future<void> _showInFolder(TorrentTask task) async {
+    if (kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS) {
+      return;
+    }
+    final destination = TorrentController.revealPath(
+      task.savePath,
+      widget.controller.files(task.id),
+    );
+    final ok = await launchUrl(Uri.file(destination));
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not open "$destination" in the file manager.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tasks = widget.controller.tasks;
@@ -158,6 +183,7 @@ class _TorrentsPageState extends State<TorrentsPage> {
                         onResume: () => widget.controller.resume(task.id),
                         onRemove: () => _confirmRemove(task),
                         onDetails: () => _showDetails(task),
+                        onShowInFolder: () => _showInFolder(task),
                       ),
                   ],
                 ),

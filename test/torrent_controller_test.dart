@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ytdlapp/features/torrents/data/torrent_engine.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_controller.dart';
+import 'package:ytdlapp/features/torrents/domain/torrent_file_info.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
 
@@ -192,6 +193,35 @@ void main() {
       final task = controller.tasks.first;
       expect(task.downloadRate, '0 B/s');
       expect(task.eta, isEmpty);
+    });
+  });
+
+  group('TorrentController revealPath', () {
+    test('single-file torrent reveals the exact file', () {
+      final path = TorrentController.revealPath('/tmp/dl', [
+        TorrentFileInfo(index: 0, name: 'movie.mp4', path: 'movie.mp4', size: 100),
+      ]);
+      expect(path, '/tmp/dl/movie.mp4');
+    });
+
+    test('multi-file torrent reveals the common top-level folder', () {
+      final files = [
+        TorrentFileInfo(index: 0, name: 'a.txt', path: 'Album/a.txt', size: 1),
+        TorrentFileInfo(index: 1, name: 'b.txt', path: 'Album/b.txt', size: 2),
+      ];
+      expect(TorrentController.revealPath('/tmp/dl', files), '/tmp/dl/Album');
+    });
+
+    test('multi-file torrent without a shared folder falls back to savePath', () {
+      final files = [
+        TorrentFileInfo(index: 0, name: 'a.txt', path: 'a.txt', size: 1),
+        TorrentFileInfo(index: 1, name: 'b.txt', path: 'b.txt', size: 2),
+      ];
+      expect(TorrentController.revealPath('/tmp/dl', files), '/tmp/dl');
+    });
+
+    test('empty file list falls back to savePath', () {
+      expect(TorrentController.revealPath('/tmp/dl', []), '/tmp/dl');
     });
   });
 }

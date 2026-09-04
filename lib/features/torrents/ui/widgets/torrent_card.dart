@@ -11,6 +11,7 @@ class TorrentCard extends StatelessWidget {
   final VoidCallback onResume;
   final VoidCallback onRemove;
   final VoidCallback onDetails;
+  final VoidCallback? onShowInFolder;
 
   const TorrentCard({
     super.key,
@@ -19,6 +20,7 @@ class TorrentCard extends StatelessWidget {
     required this.onResume,
     required this.onRemove,
     required this.onDetails,
+    this.onShowInFolder,
   });
 
   @override
@@ -110,6 +112,16 @@ class TorrentCard extends StatelessWidget {
                 onDetails,
                 dim: true,
               ),
+              if (task.isFinished && onShowInFolder != null) ...[
+                const SizedBox(width: 16),
+                _action(
+                  context,
+                  Icons.folder_open,
+                  'SHOW IN FOLDER',
+                  onShowInFolder!,
+                  dim: true,
+                ),
+              ],
               const Spacer(),
               _action(
                 context,

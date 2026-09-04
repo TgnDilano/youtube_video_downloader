@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:ytdlapp/features/torrents/data/torrent_engine.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_file_info.dart';
@@ -45,6 +46,30 @@ class TorrentController extends ChangeNotifier {
 
   /// Lists the files of a torrent via the engine (needs metadata).
   List<TorrentFileInfo> files(int id) => engine.files(id);
+
+  /// Computes the on-disk path to reveal in the OS file manager once a torrent
+  /// has finished downloading.
+  ///
+  /// librqbit lays files out under [savePath] directly: a single-file torrent
+  /// writes `<savePath>/<file>`, while a multi-file torrent writes a top-level
+  /// folder whose name appears as the first component of each file path. So we
+  /// reveal the exact file (single-file) or the containing folder (multi-file).
+  static String revealPath(String savePath, List<TorrentFileInfo> files) {
+    if (files.length == 1) {
+      final f = files.first;
+      final path = f.path.isNotEmpty ? f.path : f.name;
+      if (path.isNotEmpty) return p.join(savePath, path);
+      return savePath;
+    }
+    if (files.isNotEmpty) {
+      final tops = files
+          .map((f) => f.path.split(RegExp(r'[/\\]')).first)
+          .where((s) => s.isNotEmpty)
+          .toSet();
+      if (tops.length == 1) return p.join(savePath, tops.first);
+    }
+    return savePath;
+  }
 
   /// Pauses a torrent. Updates the task state immediately so the UI reflects
   /// the pause right away, then lets the engine poll confirm the native state.

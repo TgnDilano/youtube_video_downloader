@@ -122,16 +122,16 @@ class TubemateSidebar extends StatelessWidget {
                 onTap: () => onDestinationSelected(1),
               ),
               _NavItem(
-                icon: Icons.settings_outlined,
-                label: 'Settings',
-                active: selectedIndex == 2,
-                onTap: () => onDestinationSelected(2),
-              ),
-              _NavItem(
                 icon: Icons.bolt_outlined,
                 label: 'Torrents',
                 active: selectedIndex == 3,
                 onTap: () => onDestinationSelected(3),
+              ),
+              _NavItem(
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                active: selectedIndex == 2,
+                onTap: () => onDestinationSelected(2),
               ),
               const Spacer(),
               RotatedBox(
