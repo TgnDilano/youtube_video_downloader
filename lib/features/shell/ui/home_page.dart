@@ -392,8 +392,14 @@ class _TubemateCloneState extends State<TubemateClone>
         children: [
           TubemateSidebar(
             selectedIndex: _selectedIndex,
-            onDestinationSelected: (idx) =>
-                setState(() => _selectedIndex = idx),
+            onDestinationSelected: (idx) {
+              setState(() => _selectedIndex = idx);
+              if (idx == 0) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _urlFocusNode.requestFocus(),
+                );
+              }
+            },
           ),
           Expanded(
             child: Center(
@@ -410,7 +416,10 @@ class _TubemateCloneState extends State<TubemateClone>
                           settings: _settings,
                           controller: _controller,
                         )
-                      : TorrentsPage(controller: _torrentController),
+                      : TorrentsPage(
+                          controller: _torrentController,
+                          settings: _settings,
+                        ),
                 ),
               ),
             ),

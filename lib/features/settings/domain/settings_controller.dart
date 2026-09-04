@@ -10,6 +10,7 @@ class SettingsController extends ChangeNotifier {
   bool _isClipboardMonitorEnabled = true;
   String _cookieBrowser = 'auto';
   String? _cookiesFile;
+  String? _defaultTorrentPath;
   String _themeId = kColorSchemes.first.id;
   Color _customMain = kDefaultMain;
   Color _customPrimary = kColorSchemes.first.primary;
@@ -26,6 +27,8 @@ class SettingsController extends ChangeNotifier {
 
   String get defaultResolution => _defaultResolution;
   String? get defaultDownloadPath => _defaultDownloadPath;
+  String? get defaultTorrentPath =>
+      _defaultTorrentPath ?? _defaultDownloadPath;
   bool get isAutoPreviewEnabled => _isAutoPreviewEnabled;
   bool get isClipboardMonitorEnabled => _isClipboardMonitorEnabled;
   String get cookieBrowser => _cookieBrowser;
@@ -60,6 +63,7 @@ class SettingsController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _defaultResolution = prefs.getString('default_resolution') ?? 'best';
     _defaultDownloadPath = prefs.getString('default_download_path');
+    _defaultTorrentPath = prefs.getString('default_torrent_path');
 
     if (_defaultDownloadPath == null) {
       try {
@@ -166,6 +170,17 @@ class SettingsController extends ChangeNotifier {
       await prefs.setString('default_download_path', path);
     } else {
       await prefs.remove('default_download_path');
+    }
+    notifyListeners();
+  }
+
+  Future<void> setDefaultTorrentPath(String? path) async {
+    _defaultTorrentPath = path;
+    final prefs = await SharedPreferences.getInstance();
+    if (path != null) {
+      await prefs.setString('default_torrent_path', path);
+    } else {
+      await prefs.remove('default_torrent_path');
     }
     notifyListeners();
   }

@@ -110,10 +110,11 @@ class TubemateSidebar extends StatelessWidget {
               _Logo(),
               const SizedBox(height: 24),
               _NavItem(
-                icon: Icons.home_outlined,
-                label: 'Home',
+                icon: Icons.play_arrow_rounded,
+                label: 'Youtube',
                 active: selectedIndex == 0,
                 onTap: () => onDestinationSelected(0),
+                isYouTube: true,
               ),
               _NavItem(
                 icon: Icons.autorenew,
@@ -224,12 +225,14 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
+  final bool isYouTube;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.active,
     required this.onTap,
+    this.isYouTube = false,
   });
 
   @override
@@ -250,11 +253,14 @@ class _NavItem extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: active ? TColors.amber : TColors.textDim,
-            ),
+            if (isYouTube)
+              _YouTubeLogo(size: 18, active: active)
+            else
+              Icon(
+                icon,
+                size: 18,
+                color: active ? TColors.amber : TColors.textDim,
+              ),
             const SizedBox(height: 6),
             Text(
               label.toUpperCase(),
@@ -270,4 +276,56 @@ class _NavItem extends StatelessWidget {
       ),
     );
   }
+}
+
+class _YouTubeLogo extends StatelessWidget {
+  final double size;
+  final bool active;
+
+  const _YouTubeLogo({required this.size, required this.active});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? TColors.amber : TColors.textDim;
+    return CustomPaint(
+      size: Size(size, size * 0.75),
+      painter: _YouTubePainter(color: color),
+    );
+  }
+}
+
+class _YouTubePainter extends CustomPainter {
+  final Color color;
+
+  _YouTubePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      const Radius.circular(3),
+    );
+    final bgPaint = Paint()..color = color;
+    canvas.drawRRect(rrect, bgPaint);
+
+    final playPaint = Paint()
+      ..color = const Color(0xFF14120F)
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    final triLeft = size.width * 0.36;
+    final triRight = size.width * 0.72;
+    final triTop = size.height * 0.22;
+    final triBottom = size.height * 0.78;
+    final triTipX = triRight;
+    final triMidY = size.height / 2;
+    path.moveTo(triLeft, triTop);
+    path.lineTo(triTipX, triMidY);
+    path.lineTo(triLeft, triBottom);
+    path.close();
+    canvas.drawPath(path, playPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _YouTubePainter oldDelegate) =>
+      oldDelegate.color != color;
 }

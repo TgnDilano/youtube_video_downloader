@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:ytdlapp/core/theme/app_theme.dart';
+import 'package:ytdlapp/features/settings/domain/settings_controller.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_controller.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
@@ -12,11 +13,16 @@ import 'package:ytdlapp/features/torrents/ui/widgets/torrent_card.dart';
 import 'package:ytdlapp/features/torrents/ui/widgets/torrent_details_dialog.dart';
 
 /// The Torrents transport page: asks for a magnet link or `.torrent` file plus
-/// a save folder (always prompted per job), then lists running torrents.
+/// a save folder, then lists running torrents.
 class TorrentsPage extends StatefulWidget {
   final TorrentController controller;
+  final SettingsController settings;
 
-  const TorrentsPage({super.key, required this.controller});
+  const TorrentsPage({
+    super.key,
+    required this.controller,
+    required this.settings,
+  });
 
   @override
   State<TorrentsPage> createState() => _TorrentsPageState();
@@ -28,8 +34,11 @@ class _TorrentsPageState extends State<TorrentsPage> {
   /// A chosen `.torrent` file path, if the user opted for a file.
   String? _filePath;
 
-  /// The save folder for the in-progress add (always prompted per job).
+  /// The save folder for the in-progress add.
   String? _savePath;
+
+  /// Whether the user has explicitly overridden the default torrent path.
+  bool _savePathOverridden = false;
 
   /// The last added source. When set, the add button is armed.
   TorrentSource? _pendingSource;
@@ -37,16 +46,22 @@ class _TorrentsPageState extends State<TorrentsPage> {
   /// True while an add-torrent operation is in flight.
   bool _isAdding = false;
 
+  /// The effective save path: explicit override → settings default.
+  String get _effectiveSavePath =>
+      _savePath ?? widget.settings.defaultTorrentPath ?? '';
+
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onChanged);
+    widget.settings.addListener(_onSettingsChanged);
     _magnetController.addListener(_onInputChanged);
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onChanged);
+    widget.settings.removeListener(_onSettingsChanged);
     _magnetController.removeListener(_onInputChanged);
     _magnetController.dispose();
     super.dispose();
@@ -56,10 +71,13 @@ class _TorrentsPageState extends State<TorrentsPage> {
     if (mounted) setState(() {});
   }
 
+  void _onSettingsChanged() {
+    if (mounted && !_savePathOverridden) setState(() {});
+  }
+
   void _onInputChanged() {
     setState(() {
       _filePath = null;
-      // Auto-detect magnet links so users don't have to press Enter.
       final text = _magnetController.text.trim();
       if (text.isNotEmpty && text.startsWith('magnet:')) {
         _pendingSource = TorrentSource.magnet(text);
@@ -93,19 +111,29 @@ class _TorrentsPageState extends State<TorrentsPage> {
   Future<void> _pickSavePath() async {
     final path = await FilePicker.platform.getDirectoryPath();
     if (path == null) return;
-    setState(() => _savePath = path);
+    setState(() {
+      _savePath = path;
+      _savePathOverridden = true;
+    });
+  }
+
+  void _clearOverride() {
+    setState(() {
+      _savePath = null;
+      _savePathOverridden = false;
+    });
   }
 
   Future<void> _add() async {
     final source = _pendingSource;
-    final savePath = _savePath;
-    if (source == null || savePath == null) {
+    final savePath = _effectiveSavePath;
+    if (source == null || savePath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             source == null
                 ? 'Enter a magnet link or choose a .torrent file first.'
-                : 'Choose a save folder first.',
+                : 'Set a default torrent path in Settings or choose a folder.',
           ),
         ),
       );
@@ -115,20 +143,15 @@ class _TorrentsPageState extends State<TorrentsPage> {
     setState(() => _isAdding = true);
     try {
       final id = await widget.controller.addTorrent(source, savePath);
-      if (source.kind == TorrentSourceKind.file) {
-        // A .torrent file already carries metadata, so we can show its contents
-        // immediately instead of waiting until the download finishes.
-        final task = widget.controller.tasks.firstWhere(
-          (t) => t.id == id,
-          orElse: () => TorrentTask(id: id),
-        );
-        await _showDetails(task);
-      }
+      final task = widget.controller.tasks.firstWhere(
+        (t) => t.id == id,
+        orElse: () => TorrentTask(id: id),
+      );
+      await _showDetails(task);
       _magnetController.clear();
       setState(() {
         _filePath = null;
         _pendingSource = null;
-        _savePath = null;
       });
     } catch (e) {
       if (mounted) {
@@ -243,7 +266,7 @@ class _TorrentsPageState extends State<TorrentsPage> {
   }
 
   Widget _buildInput(BuildContext context) {
-    final primary = _pendingSource != null && _savePath != null;
+    final primary = _pendingSource != null && _effectiveSavePath.isNotEmpty;
     return Container(
       decoration: BoxDecoration(
         color: TColors.panel2,
@@ -295,15 +318,67 @@ class _TorrentsPageState extends State<TorrentsPage> {
             child: _field(
               context,
               icon: Icons.folder_outlined,
-              label: 'Save Location · always chosen per job',
-              child: Text(
-                _savePath ?? 'Not set — tap to choose folder',
-                overflow: TextOverflow.ellipsis,
-                style: TText.mono(
-                  context,
-                  size: 13,
-                  color: _savePath != null ? TColors.amber : TColors.textDim,
-                ),
+              label: 'Save Location',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _effectiveSavePath.isNotEmpty
+                          ? _effectiveSavePath
+                          : 'Not set — tap to choose folder',
+                      overflow: TextOverflow.ellipsis,
+                      style: TText.mono(
+                        context,
+                        size: 13,
+                        color: _effectiveSavePath.isNotEmpty
+                            ? TColors.amber
+                            : TColors.textDim,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_savePathOverridden)
+                    GestureDetector(
+                      onTap: _clearOverride,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: TColors.jackBg,
+                          border: Border.all(color: TColors.line),
+                        ),
+                        child: Text(
+                          'DEFAULT',
+                          style: TText.mono(
+                            context,
+                            size: 9,
+                            color: TColors.textDim,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: TColors.jackBg,
+                        border: Border.all(color: TColors.line),
+                      ),
+                      child: Text(
+                        'CHANGE',
+                        style: TText.mono(
+                          context,
+                          size: 9,
+                          color: TColors.amber,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
