@@ -6,9 +6,44 @@ use std::{
 
 use librqbit::{
     api::{Api, ApiTorrentListOpts, TorrentDetailsResponse, TorrentIdOrHash},
-    AddTorrent, AddTorrentOptions, SessionOptions, TorrentStats,
+    AddTorrent, AddTorrentOptions, DhtSessionConfig, ListenerMode, ListenerOptions,
+    SessionOptions, TorrentStats,
 };
 use tracing::{info, warn, error};
+
+/// Fixed DHT UDP listen port. A stable port lets the persisted routing table
+/// stay valid across restarts and keeps incoming DHT queries reachable, which
+/// is required for outbound peer discovery to find seeds with metadata.
+const DHT_PORT: u16 = 6881;
+
+/// Fixed TCP listen port for incoming peer (BT) connections. Magnet metadata
+/// is fetched over the peer protocol's ut_metadata extension, so we want the
+/// listener to be reachable and deterministic.
+const LISTEN_PORT: u16 = 6882;
+
+/// Well-known public DHT bootstrap routers. librqbit's default only uses two
+/// nodes; if either is unreachable the routing table never fills and magnet
+/// metadata can't resolve. Expanding the set makes cold-start peer discovery
+/// far more reliable.
+const DHT_BOOTSTRAP: &[&str] = &[
+    "dht.transmissionbt.com:6881",
+    "dht.libtorrent.org:25401",
+    "router.bittorrent.com:6881",
+    "router.utorrent.com:6881",
+    "dht.aelitis.com:6881",
+    "dht.bitcomet.com:6881",
+    "router.bitcomet.com:6881",
+];
+
+/// How long (seconds) to wait for magnet metadata resolution before giving up.
+/// DHT on a cold start can take a while; this is exposed so 120s isn't
+/// hardcoded deep in the add path.
+const MAGNET_METADATA_TIMEOUT_SECS: u64 = 180;
+
+/// How many times to retry a magnet that fails to resolve metadata. Metadata
+/// fetch on a fresh DHT table frequently fails on the first attempt; retrying
+/// with a now-warm table fixes most failures.
+const MAGNET_RETRY_COUNT: u32 = 3;
 
 /// Global, lazily-initialized librqbit session API. flutter_rust_bridge calls
 /// are stateless from Dart's perspective, so all state lives here.
@@ -26,6 +61,31 @@ fn api() -> anyhow::Result<Arc<Api>> {
         .map_err(|_| anyhow::anyhow!("session lock poisoned"))?
         .clone()
         .ok_or_else(|| anyhow::anyhow!("torrent session not initialized"))
+}
+
+/// Builds [SessionOptions] for a fixed DHT UDP port and TCP listen port.
+/// Passing `0` for either requests an ephemeral (random) port, which is used
+/// as a fallback when the preferred fixed ports are unavailable.
+fn build_session_options(dht_port: u16, listen_port: u16) -> SessionOptions {
+    SessionOptions {
+        fastresume: true,
+        ipv4_only: true,
+        dht: Some(DhtSessionConfig {
+            port: (dht_port != 0).then_some(dht_port),
+            bootstrap_addrs: Some(
+                DHT_BOOTSTRAP.iter().map(|s| s.to_string()).collect(),
+            ),
+            persistence: Some(Default::default()),
+        }),
+        listen: Some(ListenerOptions {
+            mode: ListenerMode::TcpAndUtp,
+            listen_addr: format!("0.0.0.0:{}", listen_port).parse().unwrap(),
+            announce_port: (listen_port != 0).then_some(listen_port),
+            ipv4_only: true,
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
 }
 
 /// Starts the librqbit session. [download_dir] is the default output folder.
@@ -50,11 +110,34 @@ pub async fn torrent_init(download_dir: String) -> anyhow::Result<()> {
         .try_init();
 
     info!("initializing torrent session with download_dir={}", download_dir);
-    let opts = SessionOptions {
-        fastresume: true,
-        ..Default::default()
+    // Robust session config tuned for reliable magnet metadata resolution.
+    //
+    //  * DHT: fixed UDP port, several public bootstrap routers, persisted
+    //    routing table, IPv4-only (avoid unreachable IPv6 on many networks).
+    //  * Listener: fixed TCP port for incoming peer connections (metadata is
+    //    fetched over the peer protocol). No UPnP by default; user can open
+    //    LISTEN_PORT/DHT_PORT for best results.
+    let preferred = build_session_options(DHT_PORT, LISTEN_PORT);
+    let session = match librqbit::Session::new_with_opts(
+        PathBuf::from(&download_dir),
+        preferred,
+    )
+    .await
+    {
+        Ok(s) => s,
+        Err(err) => {
+            // The preferred fixed ports may be taken by another application or
+            // a stale process. Fall back to ephemeral ports rather than
+            // failing the whole session — random ports still work, just with
+            // less reliable inbound connectivity.
+            warn!("could not bind preferred torrent ports: {:#}; falling back to ephemeral ports", err);
+            librqbit::Session::new_with_opts(
+                PathBuf::from(&download_dir),
+                build_session_options(0, 0),
+            )
+            .await?
+        }
     };
-    let session = librqbit::Session::new_with_opts(PathBuf::from(&download_dir), opts).await?;
     let api = Api::new(session, None);
     let mut guard = SESSION.lock().map_err(|_| anyhow::anyhow!("lock poisoned"))?;
     *guard = Some(Arc::new(api));
@@ -87,6 +170,10 @@ pub async fn torrent_add(source: String, save_path: String) -> anyhow::Result<u3
 
     let is_magnet_source = is_magnet(&source);
 
+    // For magnets, keep a clone so the retry loop can re-create the
+    // `AddTorrent` after `source` is moved into `from_url`.
+    let magnet_source = is_magnet_source.then(|| source.clone());
+
     let add = if is_magnet_source {
         info!("adding torrent from magnet link");
         if !source.contains("xt=urn:btih:") {
@@ -104,46 +191,83 @@ pub async fn torrent_add(source: String, save_path: String) -> anyhow::Result<u3
     };
 
     let err_path = save_path.clone();
-    let opts = AddTorrentOptions {
-        output_folder: Some(save_path),
-        ..Default::default()
-    };
 
     if is_magnet_source {
         // Spawn the magnet add as a detached tokio task so metadata resolution
         // (DHT / tracker) happens in the background.  The torrent will appear
         // in `torrent_list` once the future completes — the Dart poll loop
         // picks it up automatically.
+        //
+        // Retry: metadata fetch on a cold DHT table frequently fails on the
+        // first attempt. Each retry re-issues the add against the now-warmer
+        // DHT table, which resolves most flaky failures. After
+        // MAGNET_RETRY_COUNT failures we surface a clear error.
         info!("spawning background magnet add task");
         let api_clone = api.clone();
+        let src = magnet_source.unwrap_or_default();
         tokio::spawn(async move {
             info!("[magnet] background task started, waiting for metadata...");
-            let result = tokio::time::timeout(
-                std::time::Duration::from_secs(120),
-                api_clone.api_add_torrent(add, Some(opts)),
-            )
-            .await;
+            let mut last_error = String::new();
+            let mut resolved = false;
 
-            match result {
-                Ok(Ok(resp)) => {
-                    let id_str = resp.id.map(|i| i.to_string()).unwrap_or_default();
-                    info!("[magnet] background add completed successfully, id={}", id_str);
-                }
-                Ok(Err(e)) => {
-                    error!("[magnet] background add failed: {:#}", e);
-                    if let Ok(mut map) = PENDING_ERRORS.lock() {
-                        map.insert(err_path, format!("Add failed: {:#}", e));
+            for attempt in 1..=MAGNET_RETRY_COUNT {
+                let add = AddTorrent::from_url(src.clone());
+                let opts = AddTorrentOptions {
+                    output_folder: Some(save_path.clone()),
+                    ..Default::default()
+                };
+                info!("[magnet] metadata attempt {}/{}", attempt, MAGNET_RETRY_COUNT);
+                let result = tokio::time::timeout(
+                    std::time::Duration::from_secs(MAGNET_METADATA_TIMEOUT_SECS),
+                    api_clone.api_add_torrent(add, Some(opts)),
+                )
+                .await;
+
+                match result {
+                    Ok(Ok(resp)) => {
+                        let id_str = resp.id.map(|i| i.to_string()).unwrap_or_default();
+                        info!(
+                            "[magnet] background add completed successfully, id={}",
+                            id_str
+                        );
+                        resolved = true;
+                        break;
+                    }
+                    Ok(Err(e)) => {
+                        last_error = format!("{:#}", e);
+                        warn!(
+                            "[magnet] attempt {} add failed: {}",
+                            attempt, last_error
+                        );
+                    }
+                    Err(_elapsed) => {
+                        last_error = format!(
+                            "metadata resolution timed out after {}s",
+                            MAGNET_METADATA_TIMEOUT_SECS
+                        );
+                        warn!(
+                            "[magnet] attempt {} timed out after {}s — DHT/tracker could \
+                             not deliver metadata",
+                            attempt, MAGNET_METADATA_TIMEOUT_SECS
+                        );
                     }
                 }
-                Err(_elapsed) => {
-                    warn!(
-                        "[magnet] metadata resolution timed out after 120s — \
-                         DHT/tracker could not deliver metadata. Check your \
-                         network connection, firewall, and ensure DHT port 6881 is open."
+            }
+
+            if resolved {
+                info!("[magnet] metadata resolved");
+            } else {
+                error!("[magnet] metadata resolution failed after {} attempts", MAGNET_RETRY_COUNT);
+                if let Ok(mut map) = PENDING_ERRORS.lock() {
+                    map.insert(
+                        err_path,
+                        format!(
+                            "{} — could not find peers with metadata. Check your network, \
+                             and ensure incoming UDP/{DHT_PORT} and TCP/{LISTEN_PORT} are \
+                             reachable (or try again once DHT has warmed up).",
+                            last_error
+                        ),
                     );
-                    if let Ok(mut map) = PENDING_ERRORS.lock() {
-                        map.insert(err_path, "Metadata timed out — check network/DHT".into());
-                    }
                 }
             }
         });
@@ -160,6 +284,10 @@ pub async fn torrent_add(source: String, save_path: String) -> anyhow::Result<u3
         );
         Ok(sentinel)
     } else {
+        let opts = AddTorrentOptions {
+            output_folder: Some(save_path),
+            ..Default::default()
+        };
         let resp = api.api_add_torrent(add, Some(opts)).await?;
         let id = resp
             .id

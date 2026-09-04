@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:ytdlapp/src/rust/api/torrent.dart' as rb;
 export 'package:ytdlapp/src/rust/api/torrent.dart' show TorrentError;
 
@@ -58,6 +60,11 @@ class TorrentEngine {
 
   final Map<int, TorrentEngineSnapshot> _snapshots = {};
 
+  /// Torrent ids currently being (or recently) removed.  Filtered out of poll
+  /// results so an unawaited delete can't re-surface a row; entries are cleared
+  /// once the torrent is confirmed gone from the session.
+  final Set<int> _removedIds = {};
+
   bool _initialized = false;
   Timer? _pollTimer;
 
@@ -78,8 +85,14 @@ class TorrentEngine {
   Future<void> _poll() async {
     try {
       final list = await rb.torrentList();
+      final live = <int>{for (final t in list) t.id};
+      // Stop tombstoning ids that have actually left the session so a
+      // later re-add of the same torrent isn't hidden forever.
+      _removedIds.removeWhere((id) => !live.contains(id));
+
       final next = <int, TorrentEngineSnapshot>{};
       for (final t in list) {
+        if (_removedIds.contains(t.id)) continue;
         next[t.id] = _mapSnapshot(t);
       }
       _snapshots
@@ -158,11 +171,27 @@ class TorrentEngine {
     ];
   }
 
-  void remove(int id, {bool deleteFiles = false}) {
+  /// Removes a torrent from the session. The native call is awaited so the
+  /// torrent is really gone before the poll loop can re-discover it.
+  Future<void> remove(int id, {bool deleteFiles = false}) async {
     if (!_initialized) return;
-    unawaited(rb.torrentDelete(id: id, deleteFiles: deleteFiles));
+    _removedIds.add(id);
     _snapshots.remove(id);
+    try {
+      await rb.torrentDelete(id: id, deleteFiles: deleteFiles);
+    } catch (e) {
+      debugPrint('[TorrentEngine] remove failed for $id: $e');
+      // Fall through: the torrent stays tombstoned until it really leaves the
+      // session, then it may reappear on a later poll (correct feedback).
+    }
     tasksChanged?.call();
+  }
+
+  /// Clears removal tombstones. Called when the user explicitly re-adds a
+  /// torrent, so a reused engine id (librqbit recycles ids after a delete)
+  /// can't stay hidden forever.
+  void clearRemoved() {
+    _removedIds.clear();
   }
 
   /// Drains any pending magnet errors from the Rust side (timeout / add

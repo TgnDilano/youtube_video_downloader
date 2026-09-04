@@ -24,7 +24,9 @@ class _FakeEngine extends TorrentEngine {
   void resume(int id) => resumed.add(id);
 
   @override
-  void remove(int id, {bool deleteFiles = false}) => removed[id] = deleteFiles;
+  Future<void> remove(int id, {bool deleteFiles = false}) async {
+    removed[id] = deleteFiles;
+  }
 }
 
 void main() {
@@ -96,7 +98,7 @@ void main() {
           '/tmp',
         );
 
-        controller.remove(id);
+        await controller.remove(id);
 
         expect(
           engine.removed[id],
@@ -117,7 +119,7 @@ void main() {
         '/tmp',
       );
 
-      controller.remove(id, deleteData: true);
+      await controller.remove(id, deleteData: true);
 
       expect(engine.removed[id], isTrue);
       expect(controller.tasks, isEmpty);

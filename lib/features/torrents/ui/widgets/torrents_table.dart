@@ -5,14 +5,16 @@ import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
 
 /// Tabular view of all torrent/magnet downloads: type, name, size,
-/// downloaded, left, and status. Each row carries pause/resume, details,
-/// show-in-folder (when finished) and remove actions.
+/// downloaded, left, download/upload speed, and status. Each row carries
+/// restart (on error), pause/resume, details, show-in-folder (when finished)
+/// and remove actions.
 class TorrentsTable extends StatelessWidget {
   final List<TorrentTask> tasks;
   final void Function(TorrentTask) onPause;
   final void Function(TorrentTask) onResume;
   final void Function(TorrentTask) onRemove;
   final void Function(TorrentTask) onDetails;
+  final void Function(TorrentTask)? onRestart;
   final void Function(TorrentTask)? onShowInFolder;
 
   const TorrentsTable({
@@ -22,6 +24,7 @@ class TorrentsTable extends StatelessWidget {
     required this.onResume,
     required this.onRemove,
     required this.onDetails,
+    this.onRestart,
     this.onShowInFolder,
   });
 
@@ -65,13 +68,15 @@ class TorrentsTable extends StatelessWidget {
       ),
       child: const Row(
         children: [
-          _Head(text: 'TYPE', width: 70),
+          _Head(text: 'TYPE', width: 64),
           Expanded(child: _Head(text: 'NAME', width: double.infinity)),
-          _Head(text: 'SIZE', width: 90),
-          _Head(text: 'DOWNLOADED', width: 100),
-          _Head(text: 'LEFT', width: 100),
-          _Head(text: 'STATUS', width: 110),
-          SizedBox(width: 132),
+          _Head(text: 'SIZE', width: 82),
+          _Head(text: 'DOWNLOADED', width: 92),
+          _Head(text: 'LEFT', width: 92),
+          _Head(text: '↓ DOWN', width: 76),
+          _Head(text: '↑ UP', width: 76),
+          _Head(text: 'STATUS', width: 100),
+          SizedBox(width: 138),
         ],
       ),
     );
@@ -87,7 +92,7 @@ class TorrentsTable extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 70,
+            width: 64,
             child: Row(
               children: [
                 Icon(
@@ -128,19 +133,39 @@ class TorrentsTable extends StatelessWidget {
             ),
           ),
           SizedBox(
-            width: 90,
+            width: 82,
             child: _cell(context, task.totalSize > 0 ? _bytes(task.totalSize) : '—'),
           ),
           SizedBox(
-            width: 100,
+            width: 92,
             child: _cell(context, _bytes(task.totalDone), accent: TColors.green),
           ),
           SizedBox(
-            width: 100,
+            width: 92,
             child: _cell(context, task.totalSize > 0 ? _bytes(left) : '—'),
           ),
           SizedBox(
-            width: 110,
+            width: 76,
+            child: _cell(
+              context,
+              task.downloadRate,
+              accent: task.downloadRate.isNotEmpty && task.downloadRate != '0 B/s'
+                  ? TColors.green
+                  : TColors.textDim,
+            ),
+          ),
+          SizedBox(
+            width: 76,
+            child: _cell(
+              context,
+              task.uploadRate,
+              accent: task.uploadRate.isNotEmpty && task.uploadRate != '0 B/s'
+                  ? TColors.amber
+                  : TColors.textDim,
+            ),
+          ),
+          SizedBox(
+            width: 100,
             child: Row(
               children: [
                 task.status == TorrentStatus.fetchingMetadata
@@ -169,11 +194,25 @@ class TorrentsTable extends StatelessWidget {
             ),
           ),
           SizedBox(
-            width: 132,
+            width: 138,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (task.id >= 0) ...[
+                if (task.status == TorrentStatus.error) ...[
+                  if (onRestart != null)
+                    _iconBtn(
+                      context,
+                      Icons.replay,
+                      () => onRestart!(task),
+                      danger: false,
+                    ),
+                  _iconBtn(
+                    context,
+                    Icons.delete_outline,
+                    () => onRemove(task),
+                    danger: true,
+                  ),
+                ] else if (task.id >= 0) ...[
                   _iconBtn(
                     context,
                     task.status == TorrentStatus.paused

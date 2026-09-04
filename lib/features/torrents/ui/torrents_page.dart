@@ -188,11 +188,24 @@ class _TorrentsPageState extends State<TorrentsPage> {
   Future<void> _confirmRemove(TorrentTask task) async {
     final result = await showRemoveTorrentDialog(context, task: task);
     if (result == null) return;
-    widget.controller.remove(
+    await widget.controller.remove(
       task.id,
       deleteData: result.deleteData,
       deleteTorrentFile: result.deleteTorrentFile,
     );
+  }
+
+  Future<void> _restart(TorrentTask task) async {
+    final restarted = await widget.controller.restart(task.id);
+    if (!mounted || restarted == null) return;
+    if (restarted.status == TorrentStatus.error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not restart: ${restarted.errorMsg}'),
+          backgroundColor: TColors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _showDetails(TorrentTask task) async {
@@ -229,10 +242,15 @@ class _TorrentsPageState extends State<TorrentsPage> {
   @override
   Widget build(BuildContext context) {
     final tasks = widget.controller.tasks;
+    final error = widget.controller.lastError;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildHeader(context, tasks),
+        if (error != null) ...[
+          const SizedBox(height: 12),
+          _buildErrorBanner(context, error),
+        ],
         const SizedBox(height: 22),
         _buildInput(context),
         const SizedBox(height: 22),
@@ -244,11 +262,36 @@ class _TorrentsPageState extends State<TorrentsPage> {
                   onPause: (t) => widget.controller.pause(t.id),
                   onResume: (t) => widget.controller.resume(t.id),
                   onRemove: (t) => _confirmRemove(t),
+                  onRestart: (t) => _restart(t),
                   onDetails: (t) => _showDetails(t),
                   onShowInFolder: (t) => _showInFolder(t),
                 ),
         ),
       ],
+    );
+  }
+
+  Widget _buildErrorBanner(BuildContext context, String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: TColors.red.withValues(alpha: 0.08),
+        border: Border.all(color: TColors.red.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 16, color: TColors.red),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TText.body(context, size: 12.5, color: TColors.red),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -27,8 +28,24 @@ class TorrentController extends ChangeNotifier {
   /// persisted record during the poll cycle.
   final Map<int, String> _persistedKeyByTaskId = {};
 
-  /// Whether the initial restore from disk has completed.
+  /// Save paths of magnets/torrents the user removed while metadata was still
+  /// resolving.  The background Rust add may still complete afterwards; this
+  /// set stops the poll loop from re-surfacing those as fresh download rows.
+  final Set<String> _removedSavePaths = {};
+
+  /// Whether the initial restore from disk has completed.  Persistence writes
+  /// are gated on this so the poll loop can't clobber `torrents.json` with an
+  /// empty list before the saved records are loaded.
   bool _restored = false;
+
+  /// Re-entry guard for [restoreFromDisk] (may be called from both the success
+  /// and error paths of engine init).
+  bool _restoreStarted = false;
+
+  /// Human-readable error if engine init / persistence fails, shown to the
+  /// user so failures aren't hidden.
+  String? _lastError;
+  String? get lastError => _lastError;
 
   /// Throttle persistence writes to at most once every 5 seconds.
   DateTime? _lastPersist;
@@ -50,11 +67,15 @@ class TorrentController extends ChangeNotifier {
   /// Call once after the engine is initialized. Safe to call multiple times
   /// (idempotent after the first call).
   Future<void> restoreFromDisk() async {
-    if (_restored) return;
-    _restored = true;
+    if (_restoreStarted) return;
+    _restoreStarted = true;
 
     final saved = await _persistence.load();
-    if (saved.isEmpty) return;
+    if (saved.isEmpty) {
+      _restored = true;
+      return;
+    }
+    debugPrint('[TorrentController] restoring ${saved.length} torrents from disk');
 
     for (final pt in saved) {
       _persisted[pt.id] = pt;
@@ -64,9 +85,6 @@ class TorrentController extends ChangeNotifier {
       if (pt.sourceType == 'file' && !File(pt.source).existsSync()) {
         final source = TorrentSource.file(pt.source);
         final errorTask = TorrentTask(
-          // Negative id (engine ids are always non-negative) to avoid
-          // collision with real engine ids; pause/resume are no-ops for
-          // these since they aren't in the engine.
           id: -(pt.id.hashCode),
           savePath: pt.savePath,
           source: source,
@@ -86,41 +104,105 @@ class TorrentController extends ChangeNotifier {
 
       try {
         final engineId = await engine.reAdd(source, pt.savePath);
+        debugPrint('[TorrentController] re-added ${pt.sourceType} → engineId=$engineId');
         if (engineId != null) {
-          _tasks[engineId] ??= TorrentTask(
-            id: engineId,
+          if (engineId == _rustSentinelId) {
+            // Magnet add spawned in background — create a placeholder so the
+            // poll loop replaces it when the real torrent appears.
+            final placeholderId = _nextPlaceholderId--;
+            _tasks[placeholderId] = TorrentTask(
+              id: placeholderId,
+              savePath: pt.savePath,
+              source: source,
+              name: pt.name.isNotEmpty ? pt.name : 'Resolving metadata…',
+              status: TorrentStatus.fetchingMetadata,
+            );
+            _persistedKeyByTaskId[placeholderId] = pt.id;
+          } else {
+            _tasks[engineId] ??= TorrentTask(
+              id: engineId,
+              savePath: pt.savePath,
+              source: source,
+              name: pt.name.isNotEmpty ? pt.name : 'Fetching metadata…',
+            );
+            _persistedKeyByTaskId[engineId] = pt.id;
+          }
+        } else {
+          // The engine failed to re-add this torrent — surface it to the
+          // user instead of hiding it.
+          final errorTask = TorrentTask(
+            id: -(pt.id.hashCode),
             savePath: pt.savePath,
             source: source,
-            name: pt.name.isNotEmpty ? pt.name : 'Fetching metadata…',
+            name: pt.name.isNotEmpty ? pt.name : _fileName(pt.source),
+            status: TorrentStatus.error,
+            errorMsg: 'Failed to restore this download — the engine rejected it. '
+                'Try removing and re-adding it.',
+            totalSize: pt.totalSize,
+            totalDone: pt.totalDone,
           );
-          _persistedKeyByTaskId[engineId] = pt.id;
+          _tasks[errorTask.id] = errorTask;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[TorrentController] restore error for ${pt.id}: $e');
+        // Surface the restore failure in the UI so the user isn't left guessing.
+        final errorTask = TorrentTask(
+          id: -(pt.id.hashCode),
+          savePath: pt.savePath,
+          source: source,
+          name: pt.name.isNotEmpty ? pt.name : _fileName(pt.source),
+          status: TorrentStatus.error,
+          errorMsg: 'Restore failed: $e',
+          totalSize: pt.totalSize,
+          totalDone: pt.totalDone,
+        );
+        _tasks[errorTask.id] = errorTask;
+      }
     }
 
     // Trigger a poll to pick up all restored torrents.
     engine.tasksChanged?.call();
+    _restored = true;
+    // Persist whatever fastresume / the poll already updated so the file
+    // matches the live session state.
+    await _persistAll(immediate: true);
     notifyListeners();
   }
 
-  /// Writes the full persisted list to disk. Throttled to avoid excessive I/O.
-  Future<void> _persistAll() async {
+  /// Writes the full persisted list to disk. When [immediate] is true the
+  /// write bypasses the throttle so adds/removes are persisted right away;
+  /// the poll loop uses the throttled path.
+  Future<void> _persistAll({bool immediate = false}) async {
+    // Never write before the initial restore has loaded the saved records,
+    // otherwise the poll loop overwrites `torrents.json` with an empty list.
+    if (!_restored) return;
     final now = DateTime.now();
-    if (_lastPersist != null && now.difference(_lastPersist!) < _persistInterval) {
+    if (!immediate &&
+        _lastPersist != null &&
+        now.difference(_lastPersist!) < _persistInterval) {
       return;
     }
-    _lastPersist = now;
-    await _persistence.save(_persisted.values.toList());
+    if (immediate) _lastPersist = now;
+    debugPrint('[TorrentController] persisting ${_persisted.length} records to disk');
+    try {
+      await _persistence.save(_persisted.values.toList());
+    } catch (e) {
+      _lastError = 'Failed to save downloads: $e';
+      debugPrint('[TorrentController] persist error: $e');
+      notifyListeners();
+    }
   }
 
   void _saveRecord(PersistedTorrent pt) {
     _persisted[pt.id] = pt;
-    _persistAll();
+    debugPrint('[TorrentController] saving record ${pt.id} (${pt.sourceType})');
+    unawaited(_persistAll(immediate: true));
   }
 
   void _removeRecord(String id) {
     _persisted.remove(id);
-    _persistAll();
+    debugPrint('[TorrentController] removed record $id');
+    unawaited(_persistAll(immediate: true));
   }
 
   // ── Engine sync ──────────────────────────────────────────────────────────
@@ -143,6 +225,9 @@ class TorrentController extends ChangeNotifier {
             _persistedKeyByTaskId[info.id] = persistedKey;
           }
         } else {
+          // Skip torrents the user deleted while metadata was still
+          // resolving; their background add may complete long after removal.
+          if (_removedSavePaths.contains(info.savePath)) continue;
           _tasks[info.id] = _fromEngine(info);
           _linkPersistedRecord(_tasks[info.id]!);
         }
@@ -234,6 +319,10 @@ class TorrentController extends ChangeNotifier {
   /// feedback in the table.  The real task replaces it once the poll loop
   /// discovers the torrent after metadata resolution.
   Future<int> addTorrent(TorrentSource source, String savePath) async {
+    // The user explicitly re-added to this folder; lift any tombstones from a
+    // previous delete so the new torrent can appear normally.
+    _removedSavePaths.remove(savePath);
+    engine.clearRemoved();
     final id = await engine.add(source, savePath);
 
     // Persist immediately so the download survives a restart even if
@@ -334,13 +423,28 @@ class TorrentController extends ChangeNotifier {
 
   /// Removes a torrent from the session. Optionally deletes the downloaded
   /// data and the original `.torrent` file. Also removes the persisted record.
-  void remove(
+  ///
+  /// Placeholders (negative ids) were never registered with the engine, so the
+  /// native delete is skipped for them; their save path is tombstoned so the
+  /// background magnet add can't re-surface the row later.
+  Future<void> remove(
     int id, {
     bool deleteData = false,
     bool deleteTorrentFile = false,
-  }) {
+  }) async {
     final task = _tasks[id];
-    engine.remove(id, deleteFiles: deleteData);
+
+    if (_isPlaceholderId(id)) {
+      if (task?.savePath.isNotEmpty ?? false) {
+        _removedSavePaths.add(task!.savePath);
+      }
+    } else if (task != null) {
+      try {
+        await engine.remove(id, deleteFiles: deleteData);
+      } catch (e) {
+        debugPrint('[TorrentController] engine.remove failed for $id: $e');
+      }
+    }
 
     // Remove persisted record and clean up mapping.
     final persistedKey = _persistedKeyByTaskId.remove(id);
@@ -353,6 +457,80 @@ class TorrentController extends ChangeNotifier {
 
     _tasks.remove(id);
     notifyListeners();
+  }
+
+  /// Re-runs a failed torrent/magnet. Removes any live engine entry, then
+  /// re-adds the source so metadata resolution / download restarts.
+  ///
+  /// The persisted record is kept so a successful restart still survives an
+  /// app relaunch; if the re-add itself fails, the task stays visible as an
+  /// error row so the user can retry again.
+  Future<TorrentTask?> restart(int id) async {
+    final task = _tasks[id];
+    final source = task?.source;
+    if (source == null) return null;
+
+    final savePath = task!.savePath;
+    final persistedKey = _persistedKeyByTaskId[id];
+    final pt = persistedKey != null ? _persisted[persistedKey] : null;
+    // A user-initiated retry — clear any tombstones for this folder.
+    _removedSavePaths.remove(savePath);
+    engine.clearRemoved();
+
+    // Tear down any live engine entry for a real (positive) engine id so the
+    // source can be handed to librqbit again.
+    if (!_isPlaceholderId(id)) {
+      engine.remove(id, deleteFiles: false);
+    }
+    _tasks.remove(id);
+
+    int engineId;
+    try {
+      engineId = await engine.add(source, savePath);
+    } catch (e) {
+      final errorId = _nextPlaceholderId--;
+      final errorTask = TorrentTask(
+        id: errorId,
+        source: source,
+        savePath: savePath,
+        name: source.raw,
+        status: TorrentStatus.error,
+        errorMsg: 'Could not restart: $e',
+      );
+      _tasks[errorId] = errorTask;
+      if (pt != null) _persistedKeyByTaskId[errorId] = pt.id;
+      notifyListeners();
+      return errorTask;
+    }
+
+    TorrentTask? created;
+    if (engineId == _rustSentinelId) {
+      final placeholderId = _nextPlaceholderId--;
+      created = TorrentTask(
+        id: placeholderId,
+        source: source,
+        savePath: savePath,
+        name: 'Resolving metadata…',
+        status: TorrentStatus.fetchingMetadata,
+      );
+      _tasks[placeholderId] = created;
+      if (pt != null) _persistedKeyByTaskId[placeholderId] = pt.id;
+    } else {
+      created = TorrentTask(
+        id: engineId,
+        savePath: savePath,
+        source: source,
+      );
+      _tasks[engineId] = created;
+      if (pt != null) {
+        _persistedKeyByTaskId[engineId] = pt.id;
+      } else {
+        _linkPersistedRecord(created);
+      }
+    }
+
+    notifyListeners();
+    return created;
   }
 
   static void _deleteOriginalTorrentFile(TorrentSource source) {

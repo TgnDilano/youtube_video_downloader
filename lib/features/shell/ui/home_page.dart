@@ -83,10 +83,16 @@ class _TubemateCloneState extends State<TubemateClone>
     );
 
     // Start the libtorrent session in the background; the controller/list
-    // populate once the engine reports torrent state updates.
-    _torrentController.engine.initialize().then((_) {
+    // populate once the engine reports torrent state updates.  restoreFromDisk
+    // runs even if engine init partially fails so persisted torrents still show.
+    _torrentController.engine
+        .initialize()
+        .then((_) => _torrentController.restoreFromDisk())
+        .catchError((Object e) {
+      debugPrint('[HomePage] engine init failed: $e');
+      // Still try to restore so the user sees their persisted torrents.
       _torrentController.restoreFromDisk();
-    }).catchError((_) {});
+    });
 
     _settings.addListener(() {
       if (mounted) {

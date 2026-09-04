@@ -26,10 +26,16 @@ class TorrentPersistence {
   Future<List<PersistedTorrent>> load() async {
     try {
       final file = await _getFile();
-      if (!await file.exists()) return [];
+      debugPrint('[TorrentPersistence] loading from ${file.path}');
+      if (!await file.exists()) {
+        debugPrint('[TorrentPersistence] file does not exist');
+        return [];
+      }
       final content = await file.readAsString();
       if (content.trim().isEmpty) return [];
-      return PersistedTorrent.decodeList(content);
+      final list = PersistedTorrent.decodeList(content);
+      debugPrint('[TorrentPersistence] loaded ${list.length} torrents');
+      return list;
     } catch (e) {
       debugPrint('TorrentPersistence.load error: $e');
       return [];
@@ -40,7 +46,9 @@ class TorrentPersistence {
   Future<void> save(List<PersistedTorrent> torrents) async {
     try {
       final file = await _getFile();
-      await file.writeAsString(PersistedTorrent.encodeList(torrents));
+      final json = PersistedTorrent.encodeList(torrents);
+      await file.writeAsString(json);
+      debugPrint('[TorrentPersistence] saved ${torrents.length} torrents to ${file.path}');
     } catch (e) {
       debugPrint('TorrentPersistence.save error: $e');
     }
