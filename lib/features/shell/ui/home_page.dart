@@ -29,6 +29,8 @@ import 'package:ytdlapp/core/widgets/tubemate_controls.dart';
 import 'package:ytdlapp/core/widgets/tubemate_sidebar.dart';
 import 'package:ytdlapp/features/torrents/data/torrent_engine.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_controller.dart';
+import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
+import 'package:ytdlapp/features/torrents/ui/magnet_offer_dialog.dart';
 import 'package:ytdlapp/features/torrents/ui/torrents_page.dart';
 
 class TubemateClone extends StatefulWidget {
@@ -51,8 +53,10 @@ class _TubemateCloneState extends State<TubemateClone>
   final TextEditingController _urlController = TextEditingController();
   final FocusNode _urlFocusNode = FocusNode();
   final Set<String> _offeredUrls = {};
+  final Set<String> _offeredMagnets = {};
   final List<String> _clipboardQueue = [];
   bool _clipboardShowing = false;
+  bool _magnetOfferShowing = false;
   Timer? _scheduleTimer;
   bool _startupFired = false;
 
@@ -185,6 +189,12 @@ class _TubemateCloneState extends State<TubemateClone>
   }
 
   void _onClipboardDetected() {
+    final magnet = _clipboardWatcher.detectedMagnet;
+    if (magnet != null) {
+      _clipboardWatcher.acknowledgeMagnet(magnet);
+      _offerMagnet(magnet);
+      return;
+    }
     final url = _clipboardWatcher.detectedUrl;
     if (url == null || !mounted) return;
     _clipboardWatcher.acknowledge(url);
@@ -193,6 +203,62 @@ class _TubemateCloneState extends State<TubemateClone>
     if (_controller.tasks.any((t) => t.url == url)) return;
     _clipboardQueue.add(url);
     _processClipboardQueue();
+  }
+
+  Future<void> _offerMagnet(String magnet) async {
+    if (_magnetOfferShowing || !mounted) return;
+    if (_offeredMagnets.contains(magnet)) return;
+    if (_torrentController.tasks.any((t) => t.source?.raw == magnet)) return;
+    _offeredMagnets.add(magnet);
+    _magnetOfferShowing = true;
+    try {
+      final result = await showMagnetOfferDialog(
+        context,
+        magnet: magnet,
+        initialPath: _settings.defaultTorrentPath,
+      );
+      if (!mounted) return;
+      if (result == null) return;
+      switch (result.action) {
+        case MagnetOfferAction.download:
+          await _startMagnetDownload(magnet, result.savePath);
+        case MagnetOfferAction.openTorrents:
+          if (mounted) setState(() => _selectedIndex = 3);
+      }
+    } finally {
+      _magnetOfferShowing = false;
+    }
+  }
+
+  Future<void> _startMagnetDownload(String magnet, String savePath) async {
+    if (savePath.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pick a download folder before adding the magnet.'),
+        ),
+      );
+      return;
+    }
+    try {
+      await _torrentController.addTorrent(
+        TorrentSource.magnet(magnet),
+        savePath,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to add magnet: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _selectedIndex = 3);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Magnet added — resolving metadata via DHT…'),
+        duration: Duration(seconds: 5),
+      ),
+    );
   }
 
   Future<void> _processClipboardQueue() async {

@@ -69,4 +69,36 @@ void main() {
       watcher.dispose();
     });
   });
+
+  group('ClipboardWatcher.isMagnetLink', () {
+    const magnet =
+        'magnet:?xt=urn:btih:1234567890ABCDEF1234567890ABCDEF12345678'
+        '&dn=Big+Buck+Bunny&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337';
+
+    test('matches a plain magnet URI', () {
+      expect(ClipboardWatcher.isMagnetLink(magnet), isTrue);
+    });
+
+    test('matches a magnet embedded inside surrounding text', () {
+      expect(
+        ClipboardWatcher.isMagnetLink('Grab this: $magnet thanks!'),
+        isTrue,
+      );
+    });
+
+    test('extracts the magnet URI from surrounding text', () {
+      expect(ClipboardWatcher.extractMagnet('hi $magnet bye'), magnet);
+    });
+
+    test('rejects empty, youtube links and other text', () {
+      expect(ClipboardWatcher.isMagnetLink(''), isFalse);
+      expect(ClipboardWatcher.isMagnetLink('   '), isFalse);
+      expect(
+        ClipboardWatcher.isMagnetLink('https://youtu.be/ab12cd'),
+        isFalse,
+      );
+      expect(ClipboardWatcher.isMagnetLink('just some text'), isFalse);
+      expect(ClipboardWatcher.extractMagnet('no magnet here'), isNull);
+    });
+  });
 }

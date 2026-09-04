@@ -189,7 +189,8 @@ class SettingsPage extends StatelessWidget {
                         ),
                         title: 'Clipboard watchdog',
                         subtitle:
-                            'Detects a copied YouTube link and offers to queue it',
+                            'Detects a copied YouTube link or magnet and '
+                            'offers to download it',
                         trailing: TubemateSwitch(
                           value: settings.isClipboardMonitorEnabled,
                           onChanged: settings.setClipboardMonitor,
