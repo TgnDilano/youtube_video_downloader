@@ -478,9 +478,14 @@ class TorrentController extends ChangeNotifier {
     engine.clearRemoved();
 
     // Tear down any live engine entry for a real (positive) engine id so the
-    // source can be handed to librqbit again.
+    // source can be handed to librqbit again. This is awaited so the delete
+    // (and its persistence-store cleanup) completes before re-adding, otherwise
+    // the re-add can race and hit "already managed" without really restarting.
     if (!_isPlaceholderId(id)) {
-      engine.remove(id, deleteFiles: false);
+      await engine.remove(id, deleteFiles: false);
+      // librqbit may reuse the same engine id after a forget; make sure the
+      // removal tombstone doesn't hide the freshly re-added torrent.
+      engine.clearRemoved();
     }
     _tasks.remove(id);
 

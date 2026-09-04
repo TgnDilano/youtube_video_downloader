@@ -7,7 +7,7 @@ use std::{
 use librqbit::{
     api::{Api, ApiTorrentListOpts, TorrentDetailsResponse, TorrentIdOrHash},
     AddTorrent, AddTorrentOptions, DhtSessionConfig, ListenerMode, ListenerOptions,
-    SessionOptions, TorrentStats,
+    SessionOptions, SessionPersistenceConfig, TorrentStats,
 };
 use tracing::{info, warn, error};
 
@@ -70,6 +70,11 @@ fn build_session_options(dht_port: u16, listen_port: u16) -> SessionOptions {
     SessionOptions {
         fastresume: true,
         ipv4_only: true,
+        // JSON session persistence + fastresume is what actually persists
+        // piece progress across app restarts (see `torrent_init`). Without it
+        // librqbit uses a non-persistent bit-vector and downloaded progress is
+        // lost every time the app closes.
+        persistence: Some(SessionPersistenceConfig::Json { folder: None }),
         dht: Some(DhtSessionConfig {
             port: (dht_port != 0).then_some(dht_port),
             bootstrap_addrs: Some(
@@ -85,6 +90,17 @@ fn build_session_options(dht_port: u16, listen_port: u16) -> SessionOptions {
             ..Default::default()
         }),
         ..Default::default()
+    }
+}
+
+/// Same as [build_session_options] but without session persistence. Used as a
+/// last-resort fallback when the persistence store can't be created (e.g. the
+/// app runs sandboxed and the data directory is not writable): downloads work
+/// normally, they just don't resume across restarts.
+fn build_session_options_without_persistence(dht_port: u16, listen_port: u16) -> SessionOptions {
+    SessionOptions {
+        persistence: None,
+        ..build_session_options(dht_port, listen_port)
     }
 }
 
@@ -110,14 +126,26 @@ pub async fn torrent_init(download_dir: String) -> anyhow::Result<()> {
         .try_init();
 
     info!("initializing torrent session with download_dir={}", download_dir);
-    // Robust session config tuned for reliable magnet metadata resolution.
+    // Robust session config tuned for reliable magnet metadata resolution and
+    // download persistence:
     //
     //  * DHT: fixed UDP port, several public bootstrap routers, persisted
     //    routing table, IPv4-only (avoid unreachable IPv6 on many networks).
     //  * Listener: fixed TCP port for incoming peer connections (metadata is
     //    fetched over the peer protocol). No UPnP by default; user can open
     //    LISTEN_PORT/DHT_PORT for best results.
+    //  * Session persistence: with `fastresume: true` librqbit writes each
+    //    torrent's piece progress to disk (flushed periodically while
+    //    downloading), so closing the app does not lose download progress and
+    //    torrents auto-resume on the next launch.
+    //
+    // Fallbacks: if the preferred fixed ports are taken we retry with
+    // ephemeral ports; if the persistence store can't be created we start a
+    // session without it (downloads still work, they just don't resume).
     let preferred = build_session_options(DHT_PORT, LISTEN_PORT);
+    let ephemeral = build_session_options(0, 0);
+    let fallback = build_session_options_without_persistence(0, 0);
+
     let session = match librqbit::Session::new_with_opts(
         PathBuf::from(&download_dir),
         preferred,
@@ -125,17 +153,30 @@ pub async fn torrent_init(download_dir: String) -> anyhow::Result<()> {
     .await
     {
         Ok(s) => s,
-        Err(err) => {
-            // The preferred fixed ports may be taken by another application or
-            // a stale process. Fall back to ephemeral ports rather than
-            // failing the whole session — random ports still work, just with
-            // less reliable inbound connectivity.
-            warn!("could not bind preferred torrent ports: {:#}; falling back to ephemeral ports", err);
-            librqbit::Session::new_with_opts(
+        Err(preferred_err) => {
+            warn!(
+                "could not init session with preferred config: {:#}",
+                preferred_err
+            );
+            match librqbit::Session::new_with_opts(
                 PathBuf::from(&download_dir),
-                build_session_options(0, 0),
+                ephemeral,
             )
-            .await?
+            .await
+            {
+                Ok(s) => s,
+                Err(ephemeral_err) => {
+                    warn!(
+                        "session with ephemeral ports also failed: {:#}",
+                        ephemeral_err
+                    );
+                    librqbit::Session::new_with_opts(
+                        PathBuf::from(&download_dir),
+                        fallback,
+                    )
+                    .await?
+                }
+            }
         }
     };
     let api = Api::new(session, None);
