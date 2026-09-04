@@ -7,6 +7,7 @@ use librqbit::{
     api::{Api, ApiTorrentListOpts, TorrentDetailsResponse, TorrentIdOrHash},
     AddTorrent, AddTorrentOptions, TorrentStats,
 };
+use tracing::info;
 
 /// Global, lazily-initialized librqbit session API. flutter_rust_bridge calls
 /// are stateless from Dart's perspective, so all state lives here.
@@ -23,15 +24,21 @@ fn api() -> anyhow::Result<Arc<Api>> {
 /// Starts the librqbit session. [download_dir] is the default output folder.
 #[flutter_rust_bridge::frb]
 pub async fn torrent_init(download_dir: String) -> anyhow::Result<()> {
+    info!("initializing torrent session with download_dir={}", download_dir);
     let session = librqbit::Session::new(PathBuf::from(download_dir)).await?;
     let api = Api::new(session, None);
     let mut guard = SESSION.lock().map_err(|_| anyhow::anyhow!("lock poisoned"))?;
     *guard = Some(Arc::new(api));
+    info!("torrent session initialized successfully");
     Ok(())
 }
 
 fn looks_like_url(s: &str) -> bool {
     librqbit::SUPPORTED_SCHEMES.iter().any(|scheme| s.starts_with(scheme))
+}
+
+fn is_magnet(s: &str) -> bool {
+    s.starts_with("magnet:")
 }
 
 /// Adds a torrent from a magnet/URL or a local `.torrent` file path, saving
@@ -40,17 +47,38 @@ fn looks_like_url(s: &str) -> bool {
 pub async fn torrent_add(source: String, save_path: String) -> anyhow::Result<u32> {
     let api = api()?;
     let source = source.trim().to_string();
-    let add = if looks_like_url(&source) {
+
+    if source.is_empty() {
+        anyhow::bail!("torrent source is empty");
+    }
+
+    let add = if is_magnet(&source) {
+        info!("adding torrent from magnet link");
+        if !source.contains("xt=urn:btih:") {
+            anyhow::bail!(
+                "invalid magnet link: must contain xt=urn:btih: parameter"
+            );
+        }
+        AddTorrent::from_url(source)
+    } else if looks_like_url(&source) {
+        info!("adding torrent from URL: {}", &source);
         AddTorrent::from_url(source)
     } else {
+        info!("adding torrent from local file: {}", &source);
         AddTorrent::from_local_filename(&source)?
     };
+
     let opts = AddTorrentOptions {
         output_folder: Some(save_path),
         ..Default::default()
     };
+
     let resp = api.api_add_torrent(add, Some(opts)).await?;
-    Ok(resp.id.unwrap_or_default() as u32)
+    let id = resp
+        .id
+        .ok_or_else(|| anyhow::anyhow!("torrent was not assigned an id"))?;
+    info!("torrent added successfully with id={}", id);
+    Ok(id as u32)
 }
 
 /// Lists all torrents with their current stats.

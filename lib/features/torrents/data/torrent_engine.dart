@@ -91,8 +91,11 @@ class TorrentEngine {
   }
 
   /// Adds a torrent from a magnet URI or a `.torrent` file path.
+  /// Returns the native torrent id on success.
+  /// Throws on failure (invalid URI, DHT resolution failure, etc.).
   Future<int> add(TorrentSource source, String savePath) async {
     final id = await rb.torrentAdd(source: source.raw, savePath: savePath);
+    // Immediately poll so the new torrent appears in snapshots.
     await _poll();
     return id;
   }

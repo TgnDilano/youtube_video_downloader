@@ -34,6 +34,9 @@ class _TorrentsPageState extends State<TorrentsPage> {
   /// The last added source. When set, the add button is armed.
   TorrentSource? _pendingSource;
 
+  /// True while an add-torrent operation is in flight.
+  bool _isAdding = false;
+
   @override
   void initState() {
     super.initState();
@@ -55,8 +58,14 @@ class _TorrentsPageState extends State<TorrentsPage> {
 
   void _onInputChanged() {
     setState(() {
-      _pendingSource = null;
       _filePath = null;
+      // Auto-detect magnet links so users don't have to press Enter.
+      final text = _magnetController.text.trim();
+      if (text.isNotEmpty && text.startsWith('magnet:')) {
+        _pendingSource = TorrentSource.magnet(text);
+      } else {
+        _pendingSource = null;
+      }
     });
   }
 
@@ -102,22 +111,37 @@ class _TorrentsPageState extends State<TorrentsPage> {
       );
       return;
     }
-    final id = await widget.controller.addTorrent(source, savePath);
-    if (source.kind == TorrentSourceKind.file) {
-      // A .torrent file already carries metadata, so we can show its contents
-      // immediately instead of waiting until the download finishes.
-      final task = widget.controller.tasks.firstWhere(
-        (t) => t.id == id,
-        orElse: () => TorrentTask(id: id),
-      );
-      await _showDetails(task);
+    if (_isAdding) return;
+    setState(() => _isAdding = true);
+    try {
+      final id = await widget.controller.addTorrent(source, savePath);
+      if (source.kind == TorrentSourceKind.file) {
+        // A .torrent file already carries metadata, so we can show its contents
+        // immediately instead of waiting until the download finishes.
+        final task = widget.controller.tasks.firstWhere(
+          (t) => t.id == id,
+          orElse: () => TorrentTask(id: id),
+        );
+        await _showDetails(task);
+      }
+      _magnetController.clear();
+      setState(() {
+        _filePath = null;
+        _pendingSource = null;
+        _savePath = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add torrent: $e'),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAdding = false);
     }
-    _magnetController.clear();
-    setState(() {
-      _filePath = null;
-      _pendingSource = null;
-      _savePath = null;
-    });
   }
 
   Future<void> _confirmRemove(TorrentTask task) async {
@@ -302,25 +326,36 @@ class _TorrentsPageState extends State<TorrentsPage> {
                   ),
                 const Spacer(),
                 GestureDetector(
-                  onTap: _add,
+                  onTap: _isAdding ? null : _add,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 18,
                       vertical: 9,
                     ),
                     decoration: BoxDecoration(
-                      color: primary ? TColors.amber : TColors.lineSoft,
+                      color: _isAdding
+                          ? TColors.textDim
+                          : (primary ? TColors.amber : TColors.lineSoft),
                       border: Border.all(color: TColors.line),
                     ),
-                    child: Text(
-                      'ADD TORRENT',
-                      style: TText.mono(
-                        context,
-                        size: 11,
-                        weight: FontWeight.w600,
-                        color: primary ? TColors.jackBg : TColors.textDim,
-                      ),
-                    ),
+                    child: _isAdding
+                        ? SizedBox(
+                            width: 11,
+                            height: 11,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: TColors.textDim,
+                            ),
+                          )
+                        : Text(
+                            'ADD TORRENT',
+                            style: TText.mono(
+                              context,
+                              size: 11,
+                              weight: FontWeight.w600,
+                              color: primary ? TColors.jackBg : TColors.textDim,
+                            ),
+                          ),
                   ),
                 ),
               ],

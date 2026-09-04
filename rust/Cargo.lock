@@ -2554,6 +2554,7 @@ dependencies = [
  "librqbit",
  "serde",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
