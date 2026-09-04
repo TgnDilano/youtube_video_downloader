@@ -4,10 +4,58 @@ import 'package:ytdlapp/core/theme/app_theme.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_source.dart';
 import 'package:ytdlapp/features/torrents/domain/torrent_task.dart';
 
+/// Fills whatever width is left over like [FlexColumnWidth], but never below
+/// [min]. Without the floor a narrow window shrinks the flexible NAME column
+/// to zero pixels (the native flex width has no minimum), which makes the
+/// whole name cell disappear.
+class _MinFillingColumnWidth extends TableColumnWidth {
+  const _MinFillingColumnWidth({this.min = 120});
+
+  final double min;
+
+  @override
+  double minIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) {
+    return min;
+  }
+
+  @override
+  double maxIntrinsicWidth(Iterable<RenderBox> cells, double containerWidth) {
+    return min;
+  }
+
+  @override
+  double flex(Iterable<RenderBox> cells) => 1.0;
+}
+
+/// Fixed column widths shared by the header and every data row. The NAME
+/// column is flexible and absorbs whatever width is left over; every other
+/// column is fixed so cells always fall into the same column.
+const List<TableColumnWidth> _columns = [
+  FixedColumnWidth(76), // TYPE
+  _MinFillingColumnWidth(min: 120), // NAME
+  FixedColumnWidth(88), // SIZE
+  FixedColumnWidth(96), // DOWNLOADED
+  FixedColumnWidth(88), // LEFT
+  FixedColumnWidth(76), // DOWN
+  FixedColumnWidth(76), // UP
+  FixedColumnWidth(102), // STATUS
+  FixedColumnWidth(164), // ACTIONS (up to 4 × 34px buttons + padding)
+];
+
+/// [Table] keys column widths by column index; [_columns] is the single source
+/// of truth shared by the header and every data row.
+final Map<int, TableColumnWidth> _columnWidths = {
+  for (var i = 0; i < _columns.length; i++) i: _columns[i],
+};
+
+/// Gridline drawn between columns and between rows.
+BorderSide _gridline() => BorderSide(color: TColors.line);
+
 /// Tabular view of all torrent/magnet downloads: type, name, size,
-/// downloaded, left, download/upload speed, and status. Each row carries
-/// restart (on error), pause/resume, details, show-in-folder (when finished)
-/// and remove actions.
+/// downloaded, left, download/upload speed, and status. Runs as a real
+/// `<table>`-style layout (see `_columns`) so header and rows share the same
+/// column boundaries. Each row carries restart (on error), pause/resume,
+/// details, show-in-folder (when finished) and remove actions.
 class TorrentsTable extends StatelessWidget {
   final List<TorrentTask> tasks;
   final void Function(TorrentTask) onPause;
@@ -43,15 +91,18 @@ class TorrentsTable extends StatelessWidget {
             _empty(context)
           else
             Expanded(
-              child: ListView.separated(
-                padding: EdgeInsets.zero,
-                itemCount: tasks.length,
-                separatorBuilder: (_, _) => Container(
-                      height: 1,
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      color: TColors.line,
-                    ),
-                itemBuilder: (context, index) => _row(context, tasks[index]),
+              child: SingleChildScrollView(
+                child: Table(
+columnWidths: _columnWidths,
+                  defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                  border: TableBorder(
+                    horizontalInside: _gridline(),
+                    verticalInside: _gridline(),
+                  ),
+                  children: [
+                    for (final task in tasks) _row(context, task),
+                  ],
+                ),
               ),
             ),
         ],
@@ -61,39 +112,69 @@ class TorrentsTable extends StatelessWidget {
 
   Widget _header(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: TColors.jackBg,
-        border: Border(bottom: BorderSide(color: TColors.line)),
-      ),
-      child: const Row(
+      color: TColors.jackBg,
+      child: Table(
+        columnWidths: _columnWidths,
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        border: TableBorder(
+          bottom: _gridline(),
+          verticalInside: _gridline(),
+        ),
         children: [
-          _Head(text: 'TYPE', width: 64),
-          Expanded(child: _Head(text: 'NAME', width: double.infinity)),
-          _Head(text: 'SIZE', width: 82),
-          _Head(text: 'DOWNLOADED', width: 92),
-          _Head(text: 'LEFT', width: 92),
-          _Head(text: '↓ DOWN', width: 76),
-          _Head(text: '↑ UP', width: 76),
-          _Head(text: 'STATUS', width: 100),
-          SizedBox(width: 138),
+          TableRow(
+            children: [
+              _headCell(context, 'TYPE'),
+              _headCell(context, 'NAME'),
+              _headCell(context, 'SIZE', right: true),
+              _headCell(context, 'DOWNLOADED', right: true),
+              _headCell(context, 'LEFT', right: true),
+              _headCell(context, '↓ DOWN', right: true),
+              _headCell(context, '↑ UP', right: true),
+              _headCell(context, 'STATUS'),
+              _headCell(context, 'ACTIONS', right: true),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _row(BuildContext context, TorrentTask task) {
+  Widget _headCell(BuildContext context, String text, {bool right = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Align(
+        alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TText.mono(
+            context,
+            size: 9.5,
+            letterSpacing: 0.1,
+            color: TColors.textDim,
+            weight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  TableRow _row(BuildContext context, TorrentTask task) {
     final statusColor = _statusColor(task.status);
     final left = task.totalSize > task.totalDone
         ? task.totalSize - task.totalDone
         : 0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 64,
+    return TableRow(
+      children: [
+        _cell(
+          context,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   task.source?.kind == TorrentSourceKind.file
@@ -104,7 +185,9 @@ class TorrentsTable extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  task.source?.kind == TorrentSourceKind.file ? 'FILE' : 'MAGNET',
+                  task.source?.kind == TorrentSourceKind.file
+                      ? 'FILE'
+                      : 'MAGNET',
                   style: TText.mono(
                     context,
                     size: 9.5,
@@ -115,58 +198,94 @@ class TorrentsTable extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(
-            child: Text(
-              task.status == TorrentStatus.error && task.errorMsg.isNotEmpty
-                  ? task.errorMsg
-                  : task.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TText.body(
-                context,
-                size: 12.5,
-                weight: FontWeight.w500,
-                color: task.status == TorrentStatus.error
-                    ? TColors.red
-                    : TColors.text,
-              ),
+        ),
+        _cell(
+          context,
+          child: Text(
+            task.status == TorrentStatus.error && task.errorMsg.isNotEmpty
+                ? task.errorMsg
+                : task.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TText.body(
+              context,
+              size: 12.5,
+              weight: FontWeight.w500,
+              color: task.status == TorrentStatus.error
+                  ? TColors.red
+                  : TColors.text,
             ),
           ),
-          SizedBox(
-            width: 82,
-            child: _cell(context, task.totalSize > 0 ? _bytes(task.totalSize) : '—'),
+        ),
+        _cell(
+          context,
+          right: true,
+          child: Text(
+            task.totalSize > 0 ? _bytes(task.totalSize) : '—',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _monoCell(context),
           ),
-          SizedBox(
-            width: 92,
-            child: _cell(context, _bytes(task.totalDone), accent: TColors.green),
+        ),
+        _cell(
+          context,
+          right: true,
+          child: Text(
+            _bytes(task.totalDone),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _monoCell(context, accent: TColors.green),
           ),
-          SizedBox(
-            width: 92,
-            child: _cell(context, task.totalSize > 0 ? _bytes(left) : '—'),
+        ),
+        _cell(
+          context,
+          right: true,
+          child: Text(
+            task.totalSize > 0 ? _bytes(left) : '—',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _monoCell(context),
           ),
-          SizedBox(
-            width: 76,
-            child: _cell(
+        ),
+        _cell(
+          context,
+          right: true,
+          child: Text(
+            task.downloadRate,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _monoCell(
               context,
-              task.downloadRate,
-              accent: task.downloadRate.isNotEmpty && task.downloadRate != '0 B/s'
+              accent: task.downloadRate.isNotEmpty &&
+                      task.downloadRate != '0 B/s'
                   ? TColors.green
                   : TColors.textDim,
             ),
           ),
-          SizedBox(
-            width: 76,
-            child: _cell(
+        ),
+        _cell(
+          context,
+          right: true,
+          child: Text(
+            task.uploadRate,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _monoCell(
               context,
-              task.uploadRate,
-              accent: task.uploadRate.isNotEmpty && task.uploadRate != '0 B/s'
+              accent: task.uploadRate.isNotEmpty &&
+                      task.uploadRate != '0 B/s'
                   ? TColors.amber
                   : TColors.textDim,
             ),
           ),
-          SizedBox(
-            width: 100,
+        ),
+        _cell(
+          context,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 task.status == TorrentStatus.fetchingMetadata
                     ? SizedBox(
@@ -193,72 +312,87 @@ class TorrentsTable extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(
-            width: 138,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                if (task.status == TorrentStatus.error) ...[
-                  if (onRestart != null)
-                    _iconBtn(
-                      context,
-                      Icons.replay,
-                      () => onRestart!(task),
-                      danger: false,
-                    ),
-                  _iconBtn(
-                    context,
-                    Icons.delete_outline,
-                    () => onRemove(task),
-                    danger: true,
-                  ),
-                ] else if (task.id >= 0) ...[
-                  _iconBtn(
-                    context,
-                    task.status == TorrentStatus.paused
-                        ? Icons.play_arrow
-                        : Icons.pause_outlined,
-                    task.status == TorrentStatus.paused
-                        ? () => onResume(task)
-                        : () => onPause(task),
-                  ),
-                  _iconBtn(
-                    context,
-                    Icons.info_outline,
-                    () => onDetails(task),
-                  ),
-                  if (task.isFinished && onShowInFolder != null)
-                    _iconBtn(
-                      context,
-                      Icons.folder_open,
-                      () => onShowInFolder!(task),
-                    ),
-                  _iconBtn(
-                    context,
-                    Icons.delete_outline,
-                    () => onRemove(task),
-                    danger: true,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
+        ),
+        _cell(
+          context,
+          right: true,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: _actions(context, task),
+        ),
+      ],
+    );
+  }
+
+  /// Padding + alignment wrapper every cell goes through. [right] pushes the
+  /// content to the column's right edge (numbers) instead of the left.
+  Widget _cell(
+    BuildContext context, {
+    required Widget child,
+    EdgeInsets padding = const EdgeInsets.symmetric(
+      horizontal: 14,
+      vertical: 12,
+    ),
+    bool right = false,
+  }) {
+    return Padding(
+      padding: padding,
+      child: Align(
+        alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+        child: child,
       ),
     );
   }
 
-  Widget _cell(BuildContext context, String text, {Color? accent}) {
-    return Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TText.mono(
-        context,
-        size: 11,
-        color: accent ?? TColors.text,
-        weight: FontWeight.w600,
-      ),
+  TextStyle _monoCell(BuildContext context, {Color? accent}) {
+    return TText.mono(
+      context,
+      size: 11,
+      color: accent ?? TColors.text,
+      weight: FontWeight.w600,
+    );
+  }
+
+  Widget _actions(BuildContext context, TorrentTask task) {
+    final List<Widget> buttons = [];
+    if (task.status == TorrentStatus.error) {
+      if (onRestart != null) {
+        buttons.add(
+          _iconBtn(context, Icons.replay, () => onRestart!(task), danger: false),
+        );
+      }
+      buttons.add(
+        _iconBtn(context, Icons.delete_outline, () => onRemove(task), danger: true),
+      );
+    } else if (task.id >= 0) {
+      buttons.add(
+        _iconBtn(
+          context,
+          task.status == TorrentStatus.paused
+              ? Icons.play_arrow
+              : Icons.pause_outlined,
+          task.status == TorrentStatus.paused
+              ? () => onResume(task)
+              : () => onPause(task),
+        ),
+      );
+      buttons.add(_iconBtn(context, Icons.info_outline, () => onDetails(task)));
+      if (task.isFinished && onShowInFolder != null) {
+        buttons.add(
+          _iconBtn(
+            context,
+            Icons.folder_open,
+            () => onShowInFolder!(task),
+          ),
+        );
+      }
+      buttons.add(
+        _iconBtn(context, Icons.delete_outline, () => onRemove(task), danger: true),
+      );
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: buttons,
     );
   }
 
@@ -339,29 +473,5 @@ class TorrentsTable extends StatelessWidget {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MiB';
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GiB';
-  }
-}
-
-class _Head extends StatelessWidget {
-  final String text;
-  final double width;
-
-  const _Head({required this.text, required this.width});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: Text(
-        text,
-        style: TText.mono(
-          context,
-          size: 9.5,
-          letterSpacing: 0.1,
-          color: TColors.textDim,
-          weight: FontWeight.w600,
-        ),
-      ),
-    );
   }
 }
